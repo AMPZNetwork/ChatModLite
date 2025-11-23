@@ -1,0 +1,6 @@
+[submodule "japi"]
+	path = japi
+	url = https://github.com/comroid-git/japi
+[submodule "ModSuite"]
+	path = ModSuite
+	url = https://github.com/burdoto/ModSuite

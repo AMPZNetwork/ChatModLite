@@ -1,0 +1,29 @@
+# basic configuration
+server:
+  name: '&aMC'
+
+# rabbitmq uri
+modules.rabbitmq.rabbitUri: amqp://guest:guest@localhost:5672
+
+# chat channel configuration; the first channel is default for all players, regardless of the permission property
+# each entry can be configured with all given properties (alias:string, publish:bool and permission:string)
+channels:
+  # an example global channel, which is accessible throughout all servers
+  - global:
+      alias: g
+
+  # an example local channel, which will not be sent to rabbitmq
+  - local:
+      alias: l
+      publish: false
+
+  # an example staff channel, which requires permission 'chat.channel.staff' to join
+  - staff:
+      alias: s
+      permission: chat.channel.staff
+
+compatibility:
+  # enhanced listener compatibility mode
+  # enable this only if you are experiencing issues with moderation plugins
+  # enabling this will partially break clickable urls and similar features
+  listeners: false

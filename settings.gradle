@@ -1,0 +1,23 @@
+pluginManagement {
+    repositories {
+        mavenLocal()
+        maven {
+            name = 'comroid'
+            url = 'https://maven.comroid.org'
+        }
+        gradlePluginPortal()
+        mavenCentral()
+    }
+}
+
+rootProject.name = 'ChatModLite'
+
+include(':japi')
+
+include(':LibMod:api')
+project(':LibMod:api').projectDir = file('ModSuite/LibMod/api')
+
+include(':ChatMod:api')
+project(':ChatMod:api').projectDir = file('ModSuite/ChatMod/api')
+include(':ChatMod:AurionChat:api')
+project(':ChatMod:AurionChat:api').projectDir = file('ModSuite/ChatMod/thirdparty/AurionChat/api')

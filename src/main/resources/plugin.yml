@@ -1,0 +1,66 @@
+name: ChatMod (Lite)
+version: '1'
+main: com.ampznetwork.chatmod.lite.ChatModLite
+api-version: '1.21'
+load: STARTUP
+website: https://github.com/AMPZNetwork/ChatModLite
+softdepend:
+  - LibMod
+  - ChatMod
+  - PlaceholderAPI
+libraries:
+  # kyori
+  - 'net.kyori:adventure-platform-bungeecord:4.3.4'
+  - 'net.kyori:adventure-text-serializer-plain:4.24.0'
+  - 'net.kyori:adventure-text-serializer-legacy:4.24.0'
+  - 'net.kyori:adventure-text-serializer-json:4.24.0'
+  # parsing
+  - 'com.fasterxml.jackson.core:jackson-databind:2.18.0'
+  # rabbitmq
+  - 'com.rabbitmq:amqp-client:5.18.0'
+commands:
+  reload:
+    description: Reloads Configuration
+    permission: chatmod.reload
+  status:
+    description: Prints plugin and module status information
+    permission: chatmod.status
+  channel:
+    aliases: ch
+    description: Select Channel
+    usage: channel <info/list/join/leave/spy> [channel]
+  shout:
+    aliases: sh
+    description: Shout into a specific channel
+    usage: shout <channel> <message>
+    permission: chatmod.shout
+permissions:
+  chatmod:
+    description: Root permission node
+    default: false
+    children:
+      chatmod.reload:
+        description: Permission for the /chatmod:reload command
+        default: op
+      chatmod.status:
+        description: Permission for the /chatmod:status command
+        default: op
+      chatmod.shout:
+        description: Permission for the /chatmod:shout command
+        default: true
+      chatmod.channel:
+        description: Permission for the /chatmod:channel command
+        default: true
+        children:
+          chatmod.channel.list:
+            description: Permission for the /chatmod:channel list command
+            default: true
+          chatmod.channel.info:
+            description: Permission for the /chatmod:channel info command
+            default: true
+          chatmod.channel.join:
+            description: Permission for the /chatmod:channel join command
+            default: true
+          chatmod.channel.spy:
+            description: Permission for the /chatmod:channel spy command
+            default: op

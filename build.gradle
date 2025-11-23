@@ -1,0 +1,75 @@
+plugins {
+    id 'java-library'
+    id("xyz.jpenilla.run-paper") version "2.3.1"
+}
+
+group = 'com.ampznetwork'
+version = '1'
+
+[project(':LibMod:api'), project(':ChatMod:api')].each {
+    apply from: 'ModSuite/gradle/scripts/setup/global.gradle'
+}
+
+allprojects*.repositories {
+    maven {
+        name = 'comroid'
+        url = 'https://maven.comroid.org'
+    }
+    maven {
+        name = "spigotmc-repo"
+        url = "https://hub.spigotmc.org/nexus/content/repositories/snapshots/"
+    }
+    mavenLocal()
+    mavenCentral()
+}
+
+dependencies {
+    compileOnly 'org.spigotmc:spigot-api:1.21.1-R0.1-SNAPSHOT'
+
+    api project(':japi')
+    api project(':LibMod:api')
+    api project(':ChatMod:api')
+
+    implementation 'net.kyori:adventure-platform-bungeecord:4.3.4'
+    implementation 'net.kyori:adventure-text-serializer-plain:4.24.0'
+    implementation 'net.kyori:adventure-text-serializer-legacy:4.24.0'
+    implementation 'net.kyori:adventure-text-serializer-json:4.24.0'
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.18.0'
+    implementation 'com.rabbitmq:amqp-client:5.18.0'
+
+    compileOnly 'org.projectlombok:lombok:+'
+    annotationProcessor 'org.projectlombok:lombok:+'
+}
+
+tasks {
+    runServer {
+        minecraftVersion("1.21")
+    }
+}
+
+def targetJavaVersion = 21
+java {
+    def javaVersion = JavaVersion.toVersion(targetJavaVersion)
+    sourceCompatibility = javaVersion
+    targetCompatibility = javaVersion
+    if (JavaVersion.current() < javaVersion) {
+        toolchain.languageVersion = JavaLanguageVersion.of(targetJavaVersion)
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+
+    if (targetJavaVersion >= 10 || JavaVersion.current().isJava10Compatible()) {
+        options.release.set(targetJavaVersion)
+    }
+}
+
+processResources {
+    def props = [version: version]
+    inputs.properties props
+    filteringCharset 'UTF-8'
+    filesMatching('plugin.yml') {
+        expand props
+    }
+}
