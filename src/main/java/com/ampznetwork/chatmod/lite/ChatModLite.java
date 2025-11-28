@@ -6,6 +6,7 @@ import com.ampznetwork.chatmod.api.model.protocol.ChatMessage;
 import com.ampznetwork.chatmod.api.model.protocol.ChatMessagePacket;
 import com.ampznetwork.chatmod.api.model.protocol.internal.ChatMessagePacketImpl;
 import com.ampznetwork.chatmod.api.model.protocol.internal.PacketType;
+import com.ampznetwork.chatmod.api.util.ChatMessageParser;
 import com.ampznetwork.chatmod.lite.lang.Words;
 import com.ampznetwork.chatmod.lite.model.CommandException;
 import com.ampznetwork.chatmod.lite.model.JacksonPacketConverter;
@@ -346,5 +347,6 @@ public class ChatModLite extends JavaPlugin implements Listener {
         var channel = channels(player).filter(it -> channelName.equals(it.getName()))
                 .findAny()
                 .orElseThrow(() -> CommandException.noSuchChannel(channelName));
+        var message = new ChatMessageParser().parse(msg);
     }
 }
