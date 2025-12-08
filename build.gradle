@@ -1,7 +1,8 @@
 plugins {
     id 'java-library'
-    id("xyz.jpenilla.run-paper") version "2.3.1"
-    id("com.github.johnrengelman.shadow") version "8.1.1"
+    id 'xyz.jpenilla.run-paper' version '2.3.1'
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
+    id 'de.undercouch.download' version '5.5.+' apply false
 }
 
 group = 'com.ampznetwork'
@@ -74,3 +75,14 @@ processResources {
         expand props
     }
 }
+
+tasks.create('simpleTest', Copy) {
+    dependsOn tasks.shadowJar
+    from tasks.shadowJar.outputs.files.singleFile
+    into "$rootDir/run/spigot/plugins"
+    rename { 'ChatModLite.jar' }
+}
+
+apply from: 'ModSuite/gradle/scripts/setup/requirements.gradle'
+apply from: 'ModSuite/gradle/scripts/setup/artifacts.gradle'
+apply from: 'ModSuite/gradle/scripts/setup/intellij.gradle'

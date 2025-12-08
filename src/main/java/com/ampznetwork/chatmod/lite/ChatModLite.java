@@ -13,18 +13,24 @@ import com.ampznetwork.chatmod.lite.model.JacksonPacketConverter;
 import com.ampznetwork.chatmod.lite.model.PermissionException;
 import com.ampznetwork.libmod.api.util.Util;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.EqualsAndHashCode;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.SneakyThrows;
-import lombok.Value;
+import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.ComponentLike;
+import net.kyori.adventure.text.TextComponent;
 import net.kyori.adventure.text.serializer.bungeecord.BungeeComponentSerializer;
 import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.comroid.api.java.SoftDepend;
 import org.comroid.api.net.Rabbit;
@@ -37,6 +43,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 import java.util.logging.Level;
@@ -47,11 +54,14 @@ import static java.util.Collections.*;
 import static net.kyori.adventure.text.Component.*;
 import static net.kyori.adventure.text.format.NamedTextColor.*;
 
-@Value
-@EqualsAndHashCode(callSuper = true)
+@Getter
+@NoArgsConstructor
+@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 public class ChatModLite extends JavaPlugin implements Listener {
     ObjectMapper                                           objectMapper      = new ObjectMapper();
     MinecraftPermissionAdapter                             permissionAdapter = MinecraftPermissionAdapter.spigot();
+    ChatMessageParser                                   parser  = new ChatMessageParser();
+    Map<UUID, com.ampznetwork.libmod.api.entity.Player> players = new ConcurrentHashMap<>();
     List<Channel>                                          channels          = new ArrayList<>();
     Map<Channel, Rabbit.Exchange.Route<ChatMessagePacket>> mqChannels        = new ConcurrentHashMap<>();
     @NonFinal String  serverName;
@@ -189,14 +199,20 @@ public class ChatModLite extends JavaPlugin implements Listener {
         rabbit     = Rabbit.of(cfg.getString("modules.rabbitmq.rabbitUri", "amqp://guest:guest@localhost:5672"))
                 .assertion();
 
-        var section = cfg.getConfigurationSection("channels");
-        if (section != null) for (var channelName : section.getKeys(false))
-            channels.add(new Channel(true,
-                    channelName,
-                    section.getString("alias", null),
-                    section.getString("permission", null),
-                    null,
-                    section.getBoolean("publish", true)));
+        var section = cfg.getList("channels");
+        if (section != null)
+            for (var channelInfo : section) {
+                //noinspection unchecked
+                var map         = (Map<String, Map<String, Object>>) channelInfo;
+                var channelName = map.keySet().stream().findAny().orElseThrow();
+                var channelData = map.get(channelName);
+                channels.add(new Channel(true,
+                        channelName,
+                        (String) channelData.getOrDefault("alias", null),
+                        (String) channelData.getOrDefault("permission", null),
+                        null,
+                        (Boolean) channelData.getOrDefault("publish", Boolean.TRUE)));
+            }
 
         for (var channel : channels)
             mqChannels.put(channel,
@@ -205,7 +221,65 @@ public class ChatModLite extends JavaPlugin implements Listener {
                             "fanout",
                             channel.getName(),
                             new JacksonPacketConverter(objectMapper)));
+
+        getServer().getPluginManager().registerEvents(this, this);
     }
+
+    private com.ampznetwork.libmod.api.entity.Player getOrCreatePlayer(Player player) {
+        return players.computeIfAbsent(player.getUniqueId(),
+                k -> com.ampznetwork.libmod.api.entity.Player.basic(k, player.getName()));
+    }
+
+    @EventHandler(priority = EventPriority.HIGH)
+    public void dispatch(AsyncPlayerChatEvent event) {
+        try {
+            if (event.isCancelled()) return;
+
+            var msg          = parser.parse(event.getMessage());
+            var bukkitPlayer = event.getPlayer();
+            var player       = getOrCreatePlayer(bukkitPlayer);
+            var message = new ChatMessage(player,
+                    bukkitPlayer.getDisplayName(),
+                    event.getMessage(),
+                    (TextComponent) msg);
+            var channel = channels.stream()
+                    .filter(chl -> chl.getPlayerIDs().contains(bukkitPlayer.getUniqueId()))
+                    .findAny()
+                    .orElseGet(channels::getFirst);
+
+            send(channel, PacketType.CHAT, message);
+        } catch (Throwable t) {
+            getLogger().log(Level.WARNING, "Error in event handler", t);
+        }
+    }
+/*
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void dispatch(PlayerJoinEvent event) {
+        try {
+            playerJoin(event.getPlayer().getUniqueId(), createEventDelegate(event, DELEGATE_PROPERTY_JOIN));
+        } catch (Throwable t) {
+            mod.getLogger().log(Level.WARNING, "Error in event handler", t);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void dispatch(PlayerQuitEvent event) {
+        try {
+            playerLeave(event.getPlayer().getUniqueId(), createEventDelegate(event, DELEGATE_PROPERTY_QUIT));
+        } catch (Throwable t) {
+            mod.getLogger().log(Level.WARNING, "Error in event handler", t);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void dispatch(PlayerKickEvent event) {
+        try {
+            playerLeave(event.getPlayer().getUniqueId(), createEventDelegate(event, DELEGATE_PROPERTY_KICK));
+        } catch (Throwable t) {
+            mod.getLogger().log(Level.WARNING, "Error in event handler", t);
+        }
+    }
+ */
 
     private void execAndRespond(@NotNull CommandSender sender, Supplier<ComponentLike> exec) {
         try {
@@ -230,6 +304,14 @@ public class ChatModLite extends JavaPlugin implements Listener {
 
     private void send(Channel channel, PacketType type, ChatMessage message) {
         var packet = new ChatMessagePacketImpl(type, serverName, channel.getName(), message, new ArrayList<>());
+        var mq = mqChannels.getOrDefault(channel, null);
+
+        if (mq == null) {
+            getLogger().warning("No MQ binding found for channel " + channel);
+            return;
+        }
+
+        mq.send(packet);
     }
 
     private void requireAnyPermission(@NotNull CommandSender sender, String perm) {
@@ -348,5 +430,6 @@ public class ChatModLite extends JavaPlugin implements Listener {
                 .findAny()
                 .orElseThrow(() -> CommandException.noSuchChannel(channelName));
         var message = new ChatMessageParser().parse(msg);
+        return null; //todo
     }
 }

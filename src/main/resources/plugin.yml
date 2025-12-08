@@ -1,4 +1,4 @@
-name: ChatMod (Lite)
+name: ChatModLite
 version: '1'
 main: com.ampznetwork.chatmod.lite.ChatModLite
 api-version: '1.21'
