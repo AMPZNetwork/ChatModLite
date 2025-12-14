@@ -31,6 +31,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.comroid.api.java.SoftDepend;
 import org.comroid.api.net.Rabbit;
@@ -43,6 +44,8 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
@@ -76,8 +79,8 @@ public class ChatModLite extends JavaPlugin implements Listener {
         String channelName;
         try {
             switch (args.length) {
-                case 1:
-                    switch (args[0]) {
+                case 0:
+                    switch (label) {
                         case "reload":
                             requireAnyPermission(sender, "chatmod.reload");
                             execAndRespond(sender, () -> reload());
@@ -88,10 +91,10 @@ public class ChatModLite extends JavaPlugin implements Listener {
                             break;
                     }
                     break;
-                case 2:
-                    switch (args[0]) {
-                        case "channel":
-                            switch (args[1]) {
+                case 1:
+                    switch (label) {
+                        case "channel", "ch":
+                            switch (args[0]) {
                                 case "list":
                                     requireAnyPermission(sender, "chatmod.channel.list");
                                     execAndRespond(sender, () -> list(sender));
@@ -100,17 +103,23 @@ public class ChatModLite extends JavaPlugin implements Listener {
                                     requireAnyPermission(sender, "chatmod.channel.leave");
                                     execAndRespond(sender, () -> leave(sender));
                                     break;
+                                default:
+                                    var channelOpt = channel(args[0]);
+                                    if (channelOpt.isEmpty()) throw CommandException.noSuchChannel(args[0]);
+                                    var player = requirePlayer(sender);
+                                    channels(player).forEach(chl -> chl.getPlayerIDs().remove(player.getUniqueId()));
+                                    channelOpt.get().getPlayerIDs().add(player.getUniqueId());
                             }
                             break;
-                        case "shout":
+                        case "shout", "sh":
                             throw CommandException.notEnoughArgs("missing message");
                     }
                     break;
-                case 3:
-                    switch (args[0]) {
-                        case "channel":
-                            channelName = args[2];
-                            switch (args[1]) {
+                case 2:
+                    switch (label) {
+                        case "channel", "ch":
+                            channelName = args[1];
+                            switch (args[0]) {
                                 case "info":
                                     execAndRespond(sender, () -> info(sender, channelName));
                                     break;
@@ -122,15 +131,15 @@ public class ChatModLite extends JavaPlugin implements Listener {
                                     break;
                             }
                             break;
-                        case "shout":
-                            channelName = args[1];
-                            var msg = args[2];
+                        case "shout", "sh":
+                            channelName = args[0];
+                            var msg = args[1];
                             execAndRespond(sender, () -> shout(sender, channelName, msg));
                     }
                     break;
                 default:
-                    switch (args[0]) {
-                        case "shout":
+                    switch (label) {
+                        case "shout", "sh":
                             channelName = args[1];
                             var msg = Arrays.stream(args).skip(1).collect(Collectors.joining(" "));
                             execAndRespond(sender, () -> shout(sender, channelName, msg));
@@ -200,34 +209,67 @@ public class ChatModLite extends JavaPlugin implements Listener {
                 .assertion();
 
         var section = cfg.getList("channels");
-        if (section != null)
-            for (var channelInfo : section) {
-                //noinspection unchecked
-                var map         = (Map<String, Map<String, Object>>) channelInfo;
-                var channelName = map.keySet().stream().findAny().orElseThrow();
-                var channelData = map.get(channelName);
-                channels.add(new Channel(true,
-                        channelName,
-                        (String) channelData.getOrDefault("alias", null),
-                        (String) channelData.getOrDefault("permission", null),
-                        null,
-                        (Boolean) channelData.getOrDefault("publish", Boolean.TRUE)));
-            }
+        if (section != null) for (var channelInfo : section) {
+            //noinspection unchecked
+            var map         = (Map<String, Map<String, Object>>) channelInfo;
+            var channelName = map.keySet().stream().findAny().orElseThrow();
+            var channelData = map.get(channelName);
+            channels.add(new Channel(true,
+                    channelName,
+                    (String) channelData.getOrDefault("alias", null),
+                    (String) channelData.getOrDefault("permission", null),
+                    null,
+                    (Boolean) channelData.getOrDefault("publish", Boolean.TRUE)));
+        }
+        getLogger().info("Loaded %d channels".formatted(channels.size()));
 
-        for (var channel : channels)
-            mqChannels.put(channel,
-                    rabbit.bind(null,
-                            "minecraft.chat",
-                            "fanout",
-                            channel.getName(),
-                            new JacksonPacketConverter(objectMapper)));
+        for (var channel : channels) {
+            var route = rabbit.bind(null,
+                    "minecraft.chat",
+                    "fanout",
+                    channel.getName(),
+                    new JacksonPacketConverter(objectMapper));
+            route.subscribeData(this::localcastPacket);
+            mqChannels.put(channel, route);
+        }
+        getLogger().info("Created %d RabbitMQ bindings".formatted(mqChannels.size()));
 
         getServer().getPluginManager().registerEvents(this, this);
+    }
+
+    private void localcastPacket(ChatMessagePacket packet) {
+        var channelOpt = channel(packet.getChannel());
+
+        if (channelOpt.isEmpty()) {
+            getLogger().warning("Received message for nonexistent channel: " + packet.getChannel());
+            return;
+        }
+
+        localcast(channelOpt.get(), packet.getMessage().getFullText());
+    }
+
+    private void localcast(Channel channel, TextComponent component) {
+        final var bungeeComponent = BungeeComponentSerializer.get().serialize(component);
+        channel.getPlayerIDs().stream()
+                .map(id -> getServer().getPlayer(id))
+                .filter(Objects::nonNull)
+                .map(Player::spigot)
+                .forEach(player -> player.sendMessage(bungeeComponent));
     }
 
     private com.ampznetwork.libmod.api.entity.Player getOrCreatePlayer(Player player) {
         return players.computeIfAbsent(player.getUniqueId(),
                 k -> com.ampznetwork.libmod.api.entity.Player.basic(k, player.getName()));
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void dispatch(PlayerJoinEvent event) {
+        var id = event.getPlayer().getUniqueId();
+
+        if (channels.isEmpty() || channels.stream().anyMatch(chl -> chl.getPlayerIDs().contains(id)))
+            return;
+
+        channels.getFirst().getPlayerIDs().add(id);
     }
 
     @EventHandler(priority = EventPriority.HIGH)
@@ -248,6 +290,7 @@ public class ChatModLite extends JavaPlugin implements Listener {
                     .orElseGet(channels::getFirst);
 
             send(channel, PacketType.CHAT, message);
+            event.setCancelled(true);
         } catch (Throwable t) {
             getLogger().log(Level.WARNING, "Error in event handler", t);
         }
@@ -304,10 +347,15 @@ public class ChatModLite extends JavaPlugin implements Listener {
 
     private void send(Channel channel, PacketType type, ChatMessage message) {
         var packet = new ChatMessagePacketImpl(type, serverName, channel.getName(), message, new ArrayList<>());
-        var mq = mqChannels.getOrDefault(channel, null);
+        var mq = mqChannels.entrySet()
+                .stream()
+                .filter(e -> e.getKey().equals(channel))
+                .findAny()
+                .map(Map.Entry::getValue)
+                .orElse(null);
 
         if (mq == null) {
-            getLogger().warning("No MQ binding found for channel " + channel);
+            getLogger().warning("No MQ binding found for " + channel);
             return;
         }
 
@@ -325,6 +373,13 @@ public class ChatModLite extends JavaPlugin implements Listener {
     private Player requirePlayer(@NotNull CommandSender sender) {
         if (sender instanceof Player player) return player;
         throw new CommandException("Only players can execute this command");
+    }
+
+    private Optional<Channel> channel(String named) {
+        return channels.stream()
+                .filter(chl -> chl.getName().equalsIgnoreCase(named) || (chl.getAlias() != null && chl.getAlias()
+                        .equalsIgnoreCase(named)))
+                .findAny();
     }
 
     private Stream<Channel> channels(Player player) {
