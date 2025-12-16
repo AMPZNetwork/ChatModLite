@@ -11,6 +11,7 @@ import com.ampznetwork.chatmod.lite.lang.Words;
 import com.ampznetwork.chatmod.lite.model.CommandException;
 import com.ampznetwork.chatmod.lite.model.JacksonPacketConverter;
 import com.ampznetwork.chatmod.lite.model.PermissionException;
+import com.ampznetwork.chatmod.lite.model.PlaceholderAdapter;
 import com.ampznetwork.libmod.api.util.Util;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.AccessLevel;
@@ -23,7 +24,10 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.ComponentLike;
 import net.kyori.adventure.text.TextComponent;
 import net.kyori.adventure.text.serializer.bungeecord.BungeeComponentSerializer;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
+import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -63,12 +67,12 @@ import static net.kyori.adventure.text.format.NamedTextColor.*;
 public class ChatModLite extends JavaPlugin implements Listener {
     ObjectMapper                                           objectMapper      = new ObjectMapper();
     MinecraftPermissionAdapter                             permissionAdapter = MinecraftPermissionAdapter.spigot();
-    ChatMessageParser                                   parser  = new ChatMessageParser();
     Map<UUID, com.ampznetwork.libmod.api.entity.Player> players = new ConcurrentHashMap<>();
     List<Channel>                                          channels          = new ArrayList<>();
     Map<Channel, Rabbit.Exchange.Route<ChatMessagePacket>> mqChannels        = new ConcurrentHashMap<>();
     @NonFinal String  serverName;
     @NonFinal Rabbit  rabbit;
+    @NonFinal String formattingScheme;
     @NonFinal boolean compatibilityMode;
 
     @Override
@@ -234,24 +238,48 @@ public class ChatModLite extends JavaPlugin implements Listener {
         }
         getLogger().info("Created %d RabbitMQ bindings".formatted(mqChannels.size()));
 
+        formattingScheme  = cfg.getString("formatting.scheme", "&7[%server_name%&7] <%player_name%&7> &r%message%");
+        compatibilityMode = cfg.getBoolean("compatibility.listeners", false);
+
         getServer().getPluginManager().registerEvents(this, this);
+    }
+
+    private Component formatMessage(String channelName, OfflinePlayer sender, Component content) {
+        var raw   = LegacyComponentSerializer.legacyAmpersand().serialize(content);
+        var fixes = formattingScheme.split("%message%");
+        var adapter = SoftDepend.type("me.clip.placeholderapi.PlaceholderAPI")
+                .map($ -> PlaceholderAdapter.Hook)
+                .orElse(PlaceholderAdapter.Native);
+        var prefix = adapter.applyPlaceholders(serverName, channelName, sender, fixes[0]);
+        var suffix = fixes.length > 1 ? adapter.applyPlaceholders(serverName, channelName, sender, fixes[1]) : "";
+        return LegacyComponentSerializer.legacyAmpersand().deserialize(prefix + raw + suffix);
     }
 
     private void localcastPacket(ChatMessagePacket packet) {
         var channelOpt = channel(packet.getChannel());
-
         if (channelOpt.isEmpty()) {
             getLogger().warning("Received message for nonexistent channel: " + packet.getChannel());
             return;
         }
+        var channel = channelOpt.get();
 
-        localcast(channelOpt.get(), packet.getMessage().getFullText());
+        var sender = packet.getMessage().getSender();
+        if (sender == null) {
+            getLogger().warning("Dropping packet because it has no sender: " + packet);
+            return;
+        }
+        var player = Bukkit.getOfflinePlayer(sender.getId());
+
+        var formatted = formatMessage(channel.getName(), player, packet.getMessage().getFullText());
+        localcast(channelOpt.get(), formatted);
     }
 
-    private void localcast(Channel channel, TextComponent component) {
+    private void localcast(Channel channel, Component component) {
         final var bungeeComponent = BungeeComponentSerializer.get().serialize(component);
-        channel.getPlayerIDs().stream()
+        channel.getPlayerIDs()
+                .stream()
                 .map(id -> getServer().getPlayer(id))
+                .distinct()
                 .filter(Objects::nonNull)
                 .map(Player::spigot)
                 .forEach(player -> player.sendMessage(bungeeComponent));
@@ -266,8 +294,7 @@ public class ChatModLite extends JavaPlugin implements Listener {
     public void dispatch(PlayerJoinEvent event) {
         var id = event.getPlayer().getUniqueId();
 
-        if (channels.isEmpty() || channels.stream().anyMatch(chl -> chl.getPlayerIDs().contains(id)))
-            return;
+        if (channels.isEmpty() || channels.stream().anyMatch(chl -> chl.getPlayerIDs().contains(id))) return;
 
         channels.getFirst().getPlayerIDs().add(id);
     }
@@ -277,7 +304,7 @@ public class ChatModLite extends JavaPlugin implements Listener {
         try {
             if (event.isCancelled()) return;
 
-            var msg          = parser.parse(event.getMessage());
+            var msg = new ChatMessageParser().parse(event.getMessage());
             var bukkitPlayer = event.getPlayer();
             var player       = getOrCreatePlayer(bukkitPlayer);
             var message = new ChatMessage(player,

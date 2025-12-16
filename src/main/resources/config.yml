@@ -22,6 +22,13 @@ channels:
       alias: s
       permission: chat.channel.staff
 
+# formatter configuration
+formatting:
+  # changes the basic format of the message
+  # "%server_name%", "%player_name%" and "%message%" are special format strings that are always available
+  # otherwise there is optional PlaceholderAPI support
+  scheme: "&7[%server_name%&7] #&6%channel_name%&7 <%player_name%&7> &r%message%"
+
 compatibility:
   # enhanced listener compatibility mode
   # enable this only if you are experiencing issues with moderation plugins

@@ -21,6 +21,10 @@ allprojects*.repositories {
         name = "spigotmc-repo"
         url = "https://hub.spigotmc.org/nexus/content/repositories/snapshots/"
     }
+    maven {
+        name = 'PAPI'
+        url = 'https://repo.extendedclip.com/content/repositories/placeholderapi/'
+    }
     mavenLocal()
     mavenCentral()
 }
@@ -38,6 +42,8 @@ dependencies {
     implementation 'net.kyori:adventure-text-serializer-json:4.24.0'
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.18.0'
     implementation 'com.rabbitmq:amqp-client:5.18.0'
+
+    compileOnly 'me.clip:placeholderapi:2.+'
 
     compileOnly 'org.projectlombok:lombok:+'
     annotationProcessor 'org.projectlombok:lombok:+'
