@@ -221,6 +221,7 @@ public class ChatModLite extends JavaPlugin implements Listener {
             channels.add(new Channel(true,
                     channelName,
                     (String) channelData.getOrDefault("alias", null),
+                    (String) channelData.getOrDefault("display", null),
                     (String) channelData.getOrDefault("permission", null),
                     null,
                     (Boolean) channelData.getOrDefault("publish", Boolean.TRUE)));
@@ -229,8 +230,8 @@ public class ChatModLite extends JavaPlugin implements Listener {
 
         for (var channel : channels) {
             var route = rabbit.bind(null,
-                    "minecraft.chat",
-                    "fanout",
+                    "minecraft",
+                    "topic",
                     channel.getName(),
                     new JacksonPacketConverter(objectMapper));
             route.subscribeData(this::localcastPacket);
@@ -238,7 +239,8 @@ public class ChatModLite extends JavaPlugin implements Listener {
         }
         getLogger().info("Created %d RabbitMQ bindings".formatted(mqChannels.size()));
 
-        formattingScheme  = cfg.getString("formatting.scheme", "&7[%server_name%&7] <%player_name%&7> &r%message%");
+        formattingScheme = cfg.getString("formatting.scheme",
+                "&7[%server_name%&7] #&6%channel_name%&7 <%player_name%&7> &r%message%");
         compatibilityMode = cfg.getBoolean("compatibility.listeners", false);
 
         getServer().getPluginManager().registerEvents(this, this);
@@ -270,15 +272,16 @@ public class ChatModLite extends JavaPlugin implements Listener {
         }
         var player = Bukkit.getOfflinePlayer(sender.getId());
 
-        var formatted = formatMessage(channel.getName(), player, packet.getMessage().getFullText());
+        var formatted = formatMessage(channel.getAlternateName(), player, packet.getMessage().getFullText());
         localcast(channelOpt.get(), formatted);
     }
 
     private void localcast(Channel channel, Component component) {
         final var bungeeComponent = BungeeComponentSerializer.get().serialize(component);
+        final var server = getServer();
         channel.getPlayerIDs()
                 .stream()
-                .map(id -> getServer().getPlayer(id))
+                .map(server::getPlayer)
                 .distinct()
                 .filter(Objects::nonNull)
                 .map(Player::spigot)
@@ -386,7 +389,7 @@ public class ChatModLite extends JavaPlugin implements Listener {
             return;
         }
 
-        mq.send(packet);
+        mq.send(packet, "chat." + channel.getName());
     }
 
     private void requireAnyPermission(@NotNull CommandSender sender, String perm) {

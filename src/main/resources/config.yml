@@ -11,15 +11,18 @@ channels:
   # an example global channel, which is accessible throughout all servers
   - global:
       alias: g
+      display: "&6global"
 
   # an example local channel, which will not be sent to rabbitmq
   - local:
       alias: l
+      display: "&2local"
       publish: false
 
   # an example staff channel, which requires permission 'chat.channel.staff' to join
   - staff:
       alias: s
+      display: "&4staff"
       permission: chat.channel.staff
 
 # formatter configuration
