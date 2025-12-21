@@ -13,6 +13,7 @@ pluginManagement {
 rootProject.name = 'ChatModLite'
 
 include(':japi')
+project(':japi').projectDir = file('ModSuite/japi')
 
 include(':LibMod:api')
 project(':LibMod:api').projectDir = file('ModSuite/LibMod/api')

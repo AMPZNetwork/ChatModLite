@@ -40,6 +40,7 @@ dependencies {
     implementation 'net.kyori:adventure-text-serializer-plain:4.24.0'
     implementation 'net.kyori:adventure-text-serializer-legacy:4.24.0'
     implementation 'net.kyori:adventure-text-serializer-json:4.24.0'
+    implementation 'net.kyori:adventure-text-serializer-gson:4.24.0'
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.18.0'
     implementation 'com.rabbitmq:amqp-client:5.18.0'
 
@@ -81,6 +82,12 @@ processResources {
         expand props
     }
 }
+
+/*
+tasks.named('shadowJar', ShadowJar) {
+    relocate 'net.kyori', 'shadow.kyori'
+}
+ */
 
 tasks.create('simpleTest', Copy) {
     dependsOn tasks.shadowJar

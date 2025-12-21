@@ -228,11 +228,10 @@ public class ChatModLite extends JavaPlugin implements Listener {
         }
         getLogger().info("Loaded %d channels".formatted(channels.size()));
 
+        var exchange = rabbit.exchange("minecraft", "topic");
         for (var channel : channels) {
-            var route = rabbit.bind(null,
-                    "minecraft",
-                    "topic",
-                    channel.getName(),
+            var route = exchange.route(serverName + ".chat." + channel.getName(),
+                    "chat." + channel.getName(),
                     new JacksonPacketConverter(objectMapper));
             route.subscribeData(this::localcastPacket);
             mqChannels.put(channel, route);
