@@ -264,15 +264,17 @@ public class ChatModLite extends JavaPlugin implements Listener {
         }
         var channel = channelOpt.get();
 
-        var sender = packet.getMessage().getSender();
+        var message = packet.getMessage();
+        var sender  = message.getSender();
         if (sender == null) {
-            getLogger().warning("Dropping packet because it has no sender: " + packet);
+            getLogger().finer("Only sending packet because it has no sender: " + packet);
+            localcast(channel, message.getFullText());
             return;
         }
         var player = Bukkit.getOfflinePlayer(sender.getId());
 
-        var formatted = formatMessage(channel.getAlternateName(), player, packet.getMessage().getFullText());
-        localcast(channelOpt.get(), formatted);
+        var formatted = formatMessage(channel.getAlternateName(), player, message.getFullText());
+        localcast(channel, formatted);
     }
 
     private void localcast(Channel channel, Component component) {
