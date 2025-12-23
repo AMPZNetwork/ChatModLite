@@ -230,7 +230,8 @@ public class ChatModLite extends JavaPlugin implements Listener {
 
         var exchange = rabbit.exchange("minecraft", "topic");
         for (var channel : channels) {
-            var route = exchange.route(serverName + ".chat." + channel.getName(),
+            var route = exchange.route(Util.Kyori.sanitizePlain(serverName + ".chat." + channel.getName())
+                            .toLowerCase(),
                     "chat." + channel.getName(),
                     new JacksonPacketConverter(objectMapper));
             route.subscribeData(this::localcastPacket);
@@ -387,7 +388,7 @@ public class ChatModLite extends JavaPlugin implements Listener {
             return;
         }
 
-        mq.send(packet, "chat." + channel.getName());
+        mq.send(packet);
     }
 
     private void requireAnyPermission(@NotNull CommandSender sender, String perm) {

@@ -8,17 +8,6 @@ softdepend:
   - LibMod
   - ChatMod
   - PlaceholderAPI
-libraries:
-  # kyori
-  - 'net.kyori:adventure-platform-bungeecord:4.3.4'
-  - 'net.kyori:adventure-text-serializer-plain:4.24.0'
-  - 'net.kyori:adventure-text-serializer-legacy:4.24.0'
-  - 'net.kyori:adventure-text-serializer-json:4.24.0'
-  - 'net.kyori:adventure-text-serializer-gson:4.24.0'
-  # parsing
-  - 'com.fasterxml.jackson.core:jackson-databind:2.18.0'
-  # rabbitmq
-  - 'com.rabbitmq:amqp-client:5.18.0'
 commands:
   reload:
     description: Reloads Configuration
