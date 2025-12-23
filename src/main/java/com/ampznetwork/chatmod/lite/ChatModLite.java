@@ -231,9 +231,7 @@ public class ChatModLite extends JavaPlugin implements Listener {
         var exchange = rabbit.exchange("minecraft", "topic");
         for (var channel : channels) {
             var route = exchange.route(Util.Kyori.sanitizePlain(serverName + ".chat." + channel.getName())
-                            .toLowerCase(),
-                    "chat." + channel.getName(),
-                    new JacksonPacketConverter(objectMapper));
+                    .toLowerCase(), "chat." + channel.getName(), new JacksonPacketConverter(objectMapper));
             route.subscribeData(this::localcastPacket);
             mqChannels.put(channel, route);
         }
@@ -467,7 +465,8 @@ public class ChatModLite extends JavaPlugin implements Listener {
 
         var player   = requirePlayer(sender);
         var playerId = player.getUniqueId();
-        var channel = channels(player).filter(it -> channelName.equals(it.getName()))
+        var channel = channels.stream()
+                .filter(it -> channelName.equals(it.getName()))
                 .findAny()
                 .orElseThrow(() -> CommandException.noSuchChannel(channelName));
         if (channel.getPlayerIDs().contains(playerId)) throw new CommandException("You already joined this channel");
@@ -492,7 +491,8 @@ public class ChatModLite extends JavaPlugin implements Listener {
 
         var player   = requirePlayer(sender);
         var playerId = player.getUniqueId();
-        var channel = channels(player).filter(it -> channelName.equals(it.getName()))
+        var channel = channels.stream()
+                .filter(it -> channelName.equals(it.getName()))
                 .findAny()
                 .orElseThrow(() -> CommandException.noSuchChannel(channelName));
         var state = channel.getSpyIDs().contains(playerId);
@@ -510,10 +510,14 @@ public class ChatModLite extends JavaPlugin implements Listener {
     private Component shout(@NotNull CommandSender sender, String channelName, String msg) {
         var player   = requirePlayer(sender);
         var playerId = player.getUniqueId();
-        var channel = channels(player).filter(it -> channelName.equals(it.getName()))
+        var channel = channels.stream()
+                .filter(it -> channelName.equals(it.getName()))
                 .findAny()
                 .orElseThrow(() -> CommandException.noSuchChannel(channelName));
-        var message = new ChatMessageParser().parse(msg);
-        return null; //todo
+        var content     = new ChatMessageParser().parse(msg);
+        var basicPlayer = com.ampznetwork.libmod.api.entity.Player.basic(playerId, player.getName());
+        var message     = new ChatMessage(basicPlayer, player.getDisplayName(), msg, content);
+        send(channel, PacketType.CHAT, message);
+        return text("Message shouted: ").append(content);
     }
 }
