@@ -281,15 +281,25 @@ public class ChatModLite extends JavaPlugin implements Listener {
         try {
             if (event.isCancelled()) return;
 
-            var msg        = new ChatMessageParser().parse(event.getMessage());
+            var plaintext = event.getMessage();
+
+            String quickShoutChannelName = null;
+            if (plaintext.startsWith("@#")) {
+                var endOfName = plaintext.indexOf(' ');
+                quickShoutChannelName = plaintext.substring(2, endOfName);
+                plaintext             = plaintext.substring(endOfName + 1);
+            }
+
+            var msg        = new ChatMessageParser().parse(plaintext);
             var bukkitPlayer = event.getPlayer();
             var player       = getOrCreatePlayer(bukkitPlayer);
             var playerName = Util.Kyori.sanitizePlain(bukkitPlayer.getDisplayName());
-            var message    = new ChatMessage(player, playerName, event.getMessage(), msg);
-            var channel = channels.stream()
-                    .filter(chl -> chl.getPlayerIDs().contains(bukkitPlayer.getUniqueId()))
-                    .findAny()
-                    .orElseGet(channels::getFirst);
+            var message    = new ChatMessage(player, playerName, plaintext, msg);
+            var channel = (quickShoutChannelName != null
+                           ? channel(quickShoutChannelName)
+                           : channels.stream()
+                                   .filter(chl -> chl.getPlayerIDs().contains(bukkitPlayer.getUniqueId()))
+                                   .findAny()).orElseGet(channels::getFirst);
 
             if (hasAccess(player.getId(), channel)) {
                 var packet = new ChatMessagePacketImpl(PacketType.CHAT,
