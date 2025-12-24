@@ -8,7 +8,6 @@ import com.ampznetwork.chatmod.api.model.protocol.internal.ChatMessagePacketImpl
 import com.ampznetwork.chatmod.api.model.protocol.internal.PacketType;
 import com.ampznetwork.chatmod.api.util.ChatMessageParser;
 import com.ampznetwork.chatmod.lite.lang.Words;
-import com.ampznetwork.chatmod.lite.model.CachedSubscriptions;
 import com.ampznetwork.chatmod.lite.model.CommandException;
 import com.ampznetwork.chatmod.lite.model.JacksonPacketConverter;
 import com.ampznetwork.chatmod.lite.model.PermissionException;
@@ -24,7 +23,6 @@ import lombok.experimental.NonFinal;
 import lombok.extern.slf4j.Slf4j;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.ComponentLike;
-import net.kyori.adventure.text.TextComponent;
 import net.kyori.adventure.text.serializer.bungeecord.BungeeComponentSerializer;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
@@ -45,11 +43,6 @@ import org.comroid.commands.model.permission.MinecraftPermissionAdapter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -95,10 +88,9 @@ public class ChatModLite extends JavaPlugin implements Listener {
                     switch (label) {
                         case "reload":
                             requireAnyPermission(sender, "chatmod.reload");
-                            execAndRespond(sender, () -> reload());
+                            execAndRespond(sender, this::reload);
                             break;
                         case "status":
-                            requireAnyPermission(sender, "chatmod.status");
                             execAndRespond(sender, () -> status(sender));
                             break;
                     }
@@ -108,18 +100,19 @@ public class ChatModLite extends JavaPlugin implements Listener {
                         case "channel", "ch":
                             switch (args[0]) {
                                 case "list":
-                                    requireAnyPermission(sender, "chatmod.channel.list");
                                     execAndRespond(sender, () -> list(sender));
                                     break;
                                 case "leave":
-                                    requireAnyPermission(sender, "chatmod.channel.leave");
                                     execAndRespond(sender, () -> leave(sender));
                                     break;
+                                case "info", "join", "spy":
+                                    throw CommandException.notEnoughArgs("missing channel name");
                                 default:
                                     var channelOpt = channel(args[0]);
                                     if (channelOpt.isEmpty()) throw CommandException.noSuchChannel(args[0]);
                                     var player = requirePlayer(sender);
-                                    channels(player).forEach(chl -> chl.getPlayerIDs().remove(player.getUniqueId()));
+                                    activeChannels(player).forEach(chl -> chl.getPlayerIDs()
+                                            .remove(player.getUniqueId()));
                                     channelOpt.get().getPlayerIDs().add(player.getUniqueId());
                             }
                             break;
@@ -180,15 +173,16 @@ public class ChatModLite extends JavaPlugin implements Listener {
             case 0 -> List.of("reload", "status", "channel", "shout");
             case 1 -> switch (alias) {
                 case "channel" -> List.of("list", "info", "join", "leave", "spy");
-                case "shout" -> channelNames(sender);
+                case "shout" -> availableChannels(sender).map(ChatModules.NamedBaseConfig::getName).toList();
                 default -> emptyList();
             };
             case 2 -> switch (alias) {
                 case "channel" -> switch (args[0]) {
-                    case "join", "spy" -> channelNames(sender);
+                    case "join", "spy" -> availableChannels(sender).map(ChatModules.NamedBaseConfig::getName).toList();
                     default -> emptyList();
                 };
-                case "shout" -> channelNames(sender).contains(args[0]) ? List.of("<message>") : emptyList();
+                case "shout" -> availableChannels(sender).map(ChatModules.NamedBaseConfig::getName)
+                                        .anyMatch(args[0]::equals) ? List.of("<message>") : emptyList();
                 default -> emptyList();
             };
             default -> "shout".equals(alias) ? List.of("<message>") : emptyList();
@@ -198,8 +192,6 @@ public class ChatModLite extends JavaPlugin implements Listener {
     @Override
     @SneakyThrows
     public void onDisable() {
-        saveSubscriptions();
-
         // stop accepting events
         channels.clear();
 
@@ -238,20 +230,6 @@ public class ChatModLite extends JavaPlugin implements Listener {
         }
         getLogger().info("Loaded %d channels".formatted(channels.size()));
 
-        try (var fis = new FileInputStream(subscriptionsFile())) {
-            objectMapper.readValue(fis, CachedSubscriptions.class)
-                    .entries()
-                    .forEach(entry -> channel(entry.name()).ifPresent(channel -> channel.getSpyIDs()
-                            .addAll(entry.spies())));
-            getLogger().info("Loaded %d channel subscriptions".formatted(channels.stream()
-                    .mapToLong(channel -> channel.getSpyIDs().size())
-                    .sum()));
-        } catch (FileNotFoundException ignored) {
-            getLogger().warning("No cached subscriptions found");
-        } catch (IOException e) {
-            getLogger().log(Level.WARNING, "Failed to load cached subscriptions", e);
-        }
-
         var exchange = rabbit.exchange("minecraft", "topic");
         for (var channel : channels) {
             var route = exchange.route(Util.Kyori.sanitizePlain(serverName + ".chat." + channel.getName())
@@ -266,10 +244,6 @@ public class ChatModLite extends JavaPlugin implements Listener {
         compatibilityMode = cfg.getBoolean("compatibility.listeners", false);
 
         getServer().getPluginManager().registerEvents(this, this);
-    }
-
-    private File subscriptionsFile() {
-        return new File(getDataFolder(), "spies.json");
     }
 
     private Component formatMessage(String channelName, OfflinePlayer sender, Component content) {
@@ -310,6 +284,7 @@ public class ChatModLite extends JavaPlugin implements Listener {
                 .map(server::getPlayer)
                 .distinct()
                 .filter(Objects::nonNull)
+                .filter(player -> hasAccess(player.getUniqueId(), channel))
                 .map(Player::spigot)
                 .forEach(player -> player.sendMessage(bungeeComponent));
     }
@@ -321,11 +296,21 @@ public class ChatModLite extends JavaPlugin implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void dispatch(PlayerJoinEvent event) {
-        var id = event.getPlayer().getUniqueId();
+        var player = event.getPlayer();
+        var id     = player.getUniqueId();
 
         if (channels.isEmpty() || channels.stream().anyMatch(chl -> chl.getPlayerIDs().contains(id))) return;
 
         channels.getFirst().getPlayerIDs().add(id);
+        channels.stream()
+                .filter(channel -> permissionAdapter.checkPermissionOrOp(id, "chat.autospy." + channel.getName(), true))
+                .peek(channel -> {
+                    if (!hasAccess(id,
+                            channel)) getLogger().warning(("Player %s has auto-join permission for channel %s but does not have access to the " + "channel").formatted(
+                            player.getName(),
+                            channel.getName()));
+                })
+                .forEach(channel -> channel.getSpyIDs().add(id));
     }
 
     @EventHandler(priority = EventPriority.HIGH)
@@ -333,50 +318,55 @@ public class ChatModLite extends JavaPlugin implements Listener {
         try {
             if (event.isCancelled()) return;
 
-            var msg     = new ChatMessageParser().parse(event.getMessage());
+            var msg        = new ChatMessageParser().parse(event.getMessage());
             var bukkitPlayer = event.getPlayer();
             var player       = getOrCreatePlayer(bukkitPlayer);
-            var name    = Util.Kyori.sanitizePlain(bukkitPlayer.getDisplayName());
-            var message = new ChatMessage(player, name, event.getMessage(), (TextComponent) msg);
+            var playerName = Util.Kyori.sanitizePlain(bukkitPlayer.getDisplayName());
+            var message    = new ChatMessage(player, playerName, event.getMessage(), msg);
             var channel = channels.stream()
                     .filter(chl -> chl.getPlayerIDs().contains(bukkitPlayer.getUniqueId()))
                     .findAny()
                     .orElseGet(channels::getFirst);
 
-            send(channel, PacketType.CHAT, message);
+            if (hasAccess(player.getId(), channel)) send(channel, PacketType.CHAT, message);
+            else {
+                getLogger().warning("Player %s has no access to channel %s".formatted(playerName, channel.getName()));
+                sendToPlayer(text("Sorry, you don't have access to your current channel!", RED), bukkitPlayer);
+            }
             event.setCancelled(true);
         } catch (Throwable t) {
             getLogger().log(Level.WARNING, "Error in event handler", t);
         }
     }
-/*
-    @EventHandler(priority = EventPriority.MONITOR)
-    public void dispatch(PlayerJoinEvent event) {
-        try {
-            playerJoin(event.getPlayer().getUniqueId(), createEventDelegate(event, DELEGATE_PROPERTY_JOIN));
-        } catch (Throwable t) {
-            mod.getLogger().log(Level.WARNING, "Error in event handler", t);
-        }
-    }
 
-    @EventHandler(priority = EventPriority.MONITOR)
-    public void dispatch(PlayerQuitEvent event) {
-        try {
-            playerLeave(event.getPlayer().getUniqueId(), createEventDelegate(event, DELEGATE_PROPERTY_QUIT));
-        } catch (Throwable t) {
-            mod.getLogger().log(Level.WARNING, "Error in event handler", t);
+    /*
+        @EventHandler(priority = EventPriority.MONITOR)
+        public void dispatch(PlayerJoinEvent event) {
+            try {
+                playerJoin(event.getPlayer().getUniqueId(), createEventDelegate(event, DELEGATE_PROPERTY_JOIN));
+            } catch (Throwable t) {
+                mod.getLogger().log(Level.WARNING, "Error in event handler", t);
+            }
         }
-    }
 
-    @EventHandler(priority = EventPriority.MONITOR)
-    public void dispatch(PlayerKickEvent event) {
-        try {
-            playerLeave(event.getPlayer().getUniqueId(), createEventDelegate(event, DELEGATE_PROPERTY_KICK));
-        } catch (Throwable t) {
-            mod.getLogger().log(Level.WARNING, "Error in event handler", t);
+        @EventHandler(priority = EventPriority.MONITOR)
+        public void dispatch(PlayerQuitEvent event) {
+            try {
+                playerLeave(event.getPlayer().getUniqueId(), createEventDelegate(event, DELEGATE_PROPERTY_QUIT));
+            } catch (Throwable t) {
+                mod.getLogger().log(Level.WARNING, "Error in event handler", t);
+            }
         }
-    }
- */
+
+        @EventHandler(priority = EventPriority.MONITOR)
+        public void dispatch(PlayerKickEvent event) {
+            try {
+                playerLeave(event.getPlayer().getUniqueId(), createEventDelegate(event, DELEGATE_PROPERTY_KICK));
+            } catch (Throwable t) {
+                mod.getLogger().log(Level.WARNING, "Error in event handler", t);
+            }
+        }
+     */
 
     private void execAndRespond(@NotNull CommandSender sender, Supplier<ComponentLike> exec) {
         try {
@@ -386,21 +376,16 @@ public class ChatModLite extends JavaPlugin implements Listener {
             } catch (CommandException cex) {
                 component = cex.toComponent();
             }
-            var serialized = BungeeComponentSerializer.get().serialize(component.asComponent());
-            sender.spigot().sendMessage(serialized);
+            if (sender instanceof Player player && component != null) sendToPlayer(component, player);
         } catch (Throwable t) {
             sender.sendMessage(ChatColor.RED + "An internal error occurred");
             getLogger().log(Level.WARNING, "Could not execute command", t);
         }
     }
 
-    private List<String> channelNames(CommandSender sender) {
-        if (sender instanceof Player player) return channels.stream().filter(channel -> {
-            var permission = channel.getPermission();
-            return permission == null || permissionAdapter.checkPermission(player.getUniqueId(), permission)
-                    .toBooleanOrElse(false);
-        }).map(ChatModules.NamedBaseConfig::getName).toList();
-        return emptyList();
+    private void sendToPlayer(ComponentLike component, @NotNull Player player) {
+        var serialized = BungeeComponentSerializer.get().serialize(component.asComponent());
+        player.spigot().sendMessage(serialized);
     }
 
     private void send(Channel channel, PacketType type, ChatMessage message) {
@@ -420,12 +405,12 @@ public class ChatModLite extends JavaPlugin implements Listener {
         mq.send(packet);
     }
 
-    private void requireAnyPermission(@NotNull CommandSender sender, String perm) {
+    private void requireAnyPermission(@NotNull CommandSender sender, @NotNull String perm) {
         if (!(sender instanceof Player player))
             // not player; thus console or fakeplayer; allow
             return;
-        var result = permissionAdapter.checkPermission(player.getUniqueId(), perm, true);
-        if (!result.toBooleanOrElse(false)) throw new PermissionException(perm);
+        var result = permissionAdapter.checkPermissionOrOp(player.getUniqueId(), perm, true);
+        if (!result) throw new PermissionException(perm);
     }
 
     private Player requirePlayer(@NotNull CommandSender sender) {
@@ -440,35 +425,50 @@ public class ChatModLite extends JavaPlugin implements Listener {
                 .findAny();
     }
 
-    private Stream<Channel> channels(Player player) {
-        var playerId = player.getUniqueId();
-        return Stream.concat(channels.stream().filter(channel -> channel.getPlayerIDs().contains(playerId)),
-                        channels.stream().filter(channel -> channel.getSpyIDs().contains(playerId)))
-                .filter(channel -> channel.getPermission() == null || permissionAdapter.checkPermission(playerId,
-                        channel.getPermission()).toBooleanOrElse(false));
+    private Stream<Channel> availableChannels(CommandSender sender) {
+        var stream = channels.stream();
+        if (sender instanceof Player player) stream = stream.filter(channel -> hasAccess(player.getUniqueId(),
+                channel));
+        return stream;
+    }
+
+    private Stream<Channel> activeChannels(CommandSender sender) {
+        if (sender instanceof Player player) {
+            var playerId = player.getUniqueId();
+            return Stream.concat(channels.stream().filter(channel -> channel.getPlayerIDs().contains(playerId)),
+                            channels.stream().filter(channel -> channel.getSpyIDs().contains(playerId)))
+                    .filter(channel -> hasAccess(playerId, channel));
+        }
+        return Stream.empty();
     }
 
     private Component reload() {
         onDisable();
         reloadConfig();
         onEnable();
+
         return text("Reload complete!", GREEN);
     }
 
     private Component status(@NotNull CommandSender sender) {
+        requireAnyPermission(sender, "chatmod.status");
+
         var player   = requirePlayer(sender);
         var playerId = player.getUniqueId();
-        return text("Current channels:\n", BLUE).append(channels(player).sorted(Comparator.comparingInt(channel ->
+        return text("Current channels:\n", BLUE).append(activeChannels(player).sorted(Comparator.comparingInt(channel ->
                 channel.getSpyIDs().contains(playerId)
                 ? 1
                 : 0)).map(channel -> channel.toComponent(playerId)).collect(Util.Kyori.collector(text("\n"))));
     }
 
     private ComponentLike list(@NotNull CommandSender sender) {
+        requireAnyPermission(sender, "chatmod.channel.list");
+
         var player   = requirePlayer(sender);
         var playerId = player.getUniqueId();
-        return text("Available channels:\n", BLUE).append(channels(player).map(channel -> channel.toComponent(playerId))
-                .collect(Util.Kyori.collector(text("\n"))));
+        return text("Available channels:\n", BLUE).append(availableChannels(player).map(channel -> channelInfoComponent(
+                channel,
+                playerId)).collect(Util.Kyori.collector(text("\n"))));
     }
 
     private Component info(@NotNull CommandSender sender, String channelName) {
@@ -480,15 +480,7 @@ public class ChatModLite extends JavaPlugin implements Listener {
                 .filter(it -> channelName.equals(it.getName()))
                 .findAny()
                 .orElseThrow(() -> CommandException.noSuchChannel(channelName));
-        var alias = channel.getAlias();
-        var text = text("Channel: ", BLUE).append(text(channelName, AQUA))
-                .append(text("\n - Alias: ", BLUE))
-                .append(alias == null ? text("(none)", GRAY) : text(channel.getAlias(), AQUA));
-        if (permissionAdapter.checkOpLevel(playerId) && channel.getPermission() instanceof String perm) text = text.append(
-                text("\n - Permission: ")).append(text(perm, AQUA));
-        var state = channel.getState(playerId);
-        text = text.append(text("\n - Status: ")).append(state.toComponent());
-        return text;
+        return channelInfoComponent(channel, playerId);
     }
 
     private Component join(@NotNull CommandSender sender, String channelName) {
@@ -501,7 +493,7 @@ public class ChatModLite extends JavaPlugin implements Listener {
                 .findAny()
                 .orElseThrow(() -> CommandException.noSuchChannel(channelName));
         if (channel.getPlayerIDs().contains(playerId)) throw new CommandException("You already joined this channel");
-        var previous = channels(player).filter(it -> it.getPlayerIDs().remove(playerId)).count();
+        var previous = activeChannels(player).filter(it -> it.getPlayerIDs().remove(playerId)).count();
         getLogger().fine("Removed player %s from %d previously joined channels".formatted(player, previous));
         channel.getPlayerIDs().add(playerId);
         return text("Joined channel ", BLUE).append(channel.toComponent());
@@ -512,7 +504,7 @@ public class ChatModLite extends JavaPlugin implements Listener {
 
         var player   = requirePlayer(sender);
         var playerId = player.getUniqueId();
-        var count    = channels(player).filter(channel -> channel.getPlayerIDs().remove(playerId)).count();
+        var count = activeChannels(player).filter(channel -> channel.getPlayerIDs().remove(playerId)).count();
         return text("You were removed from ", BLUE).append(text(count, GREEN))
                 .append(text(" " + Words.CHANNEL.apply(count), BLUE));
     }
@@ -527,18 +519,14 @@ public class ChatModLite extends JavaPlugin implements Listener {
                 .findAny()
                 .orElseThrow(() -> CommandException.noSuchChannel(channelName));
         var state = channel.getSpyIDs().contains(playerId);
-        try {
-            if (state) {
-                if (channel.getSpyIDs().remove(playerId))
-                    return text("You stopped spying on ", GOLD).append(channel.toComponent(playerId));
-                else throw CommandException.unsuccessful("could not unspy on channel " + channelName);
-            } else {
-                if (channel.getSpyIDs().add(playerId))
-                    return text("You are spying on ", GOLD).append(channel.toComponent(playerId));
-                else throw CommandException.unsuccessful("could not spy on channel " + channelName);
-            }
-        } finally {
-            saveSubscriptions();
+        if (state) {
+            if (channel.getSpyIDs().remove(playerId))
+                return text("You stopped spying on ", GOLD).append(channel.toComponent(playerId));
+            else throw CommandException.unsuccessful("could not unspy on channel " + channelName);
+        } else {
+            if (channel.getSpyIDs().add(playerId))
+                return text("You are spying on ", GOLD).append(channel.toComponent(playerId));
+            else throw CommandException.unsuccessful("could not spy on channel " + channelName);
         }
     }
 
@@ -556,16 +544,19 @@ public class ChatModLite extends JavaPlugin implements Listener {
         return text("Message shouted: ").append(content);
     }
 
-    private void saveSubscriptions() {
-        var entries = channels.stream()
-                .map(channel -> new CachedSubscriptions.ChannelEntry(channel.getName(),
-                        List.copyOf(channel.getSpyIDs())))
-                .toList();
-        var subscriptions = new CachedSubscriptions(entries);
-        try (var fos = new FileOutputStream(subscriptionsFile())) {
-            objectMapper.writeValue(fos, subscriptions);
-        } catch (IOException e) {
-            getLogger().log(Level.WARNING, "Could not save subscriptions to " + subscriptionsFile(), e);
-        }
+    private Component channelInfoComponent(Channel channel, UUID playerId) {
+        var alias = channel.getAlias();
+        var text = text("Channel: ", AQUA).append(channel.toComponent())
+                .append(text("\n - Alias: ", AQUA))
+                .append(alias == null ? text("(none)", GRAY) : text(channel.getAlias(), YELLOW));
+        if (hasAccess(playerId, channel) && channel.getPermission() instanceof String permission) text = text.append(
+                text("\n - Permission: ", AQUA)).append(text(permission, YELLOW));
+        var state = channel.getState(playerId);
+        return text.append(text("\n - Status: ")).append(state.toComponent());
+    }
+
+    private boolean hasAccess(UUID id, Channel channel) {
+        return channel.getPermission() == null || permissionAdapter.checkPermissionOrOp(id,
+                "chat.channel." + channel.getName());
     }
 }
