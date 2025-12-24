@@ -232,6 +232,7 @@ public class ChatModLite extends JavaPlugin implements Listener {
 
         var exchange = rabbit.exchange("minecraft", "topic");
         for (var channel : channels) {
+            if (!channel.isPublish()) continue;
             var route = exchange.route(Util.Kyori.sanitizePlain(serverName + ".chat." + channel.getName())
                     .toLowerCase(), "chat." + channel.getName(), new JacksonPacketConverter(objectMapper));
             route.subscribeData(this::localcastPacket);
@@ -246,13 +247,13 @@ public class ChatModLite extends JavaPlugin implements Listener {
         getServer().getPluginManager().registerEvents(this, this);
     }
 
-    private Component formatMessage(String channelName, OfflinePlayer sender, Component content) {
+    private Component formatMessage(String source, String channelName, OfflinePlayer sender, Component content) {
         var raw   = LegacyComponentSerializer.legacyAmpersand().serialize(content);
         var fixes = formattingScheme.split("%message%");
         var adapter = SoftDepend.type("me.clip.placeholderapi.PlaceholderAPI")
                 .map($ -> PlaceholderAdapter.Hook)
                 .orElse(PlaceholderAdapter.Native);
-        var prefix = adapter.applyPlaceholders(serverName, channelName, sender, fixes[0]);
+        var prefix = adapter.applyPlaceholders(source, channelName, sender, fixes[0]);
         var suffix = fixes.length > 1 ? adapter.applyPlaceholders(serverName, channelName, sender, fixes[1]) : "";
         return LegacyComponentSerializer.legacyAmpersand().deserialize(prefix + raw + suffix);
     }
@@ -271,7 +272,7 @@ public class ChatModLite extends JavaPlugin implements Listener {
 
         if (sender != null) {
             var player = Bukkit.getOfflinePlayer(sender.getId());
-            formatted = formatMessage(channel.getAlternateName(), player, formatted);
+            formatted = formatMessage(packet.getSource(), channel.getAlternateName(), player, formatted);
         }
 
         localcast(channel, formatted);
@@ -328,8 +329,14 @@ public class ChatModLite extends JavaPlugin implements Listener {
                     .findAny()
                     .orElseGet(channels::getFirst);
 
-            if (hasAccess(player.getId(), channel)) send(channel, PacketType.CHAT, message);
-            else {
+            if (hasAccess(player.getId(), channel)) {
+                var packet = new ChatMessagePacketImpl(PacketType.CHAT,
+                        serverName,
+                        channel.getName(),
+                        message,
+                        new ArrayList<>());
+                outbound(channel, packet);
+            } else {
                 getLogger().warning("Player %s has no access to channel %s".formatted(playerName, channel.getName()));
                 sendToPlayer(text("Sorry, you don't have access to your current channel!", RED), bukkitPlayer);
             }
@@ -367,7 +374,6 @@ public class ChatModLite extends JavaPlugin implements Listener {
             }
         }
      */
-
     private void execAndRespond(@NotNull CommandSender sender, Supplier<ComponentLike> exec) {
         try {
             ComponentLike component;
@@ -388,17 +394,22 @@ public class ChatModLite extends JavaPlugin implements Listener {
         player.spigot().sendMessage(serialized);
     }
 
-    private void send(Channel channel, PacketType type, ChatMessage message) {
-        var packet = new ChatMessagePacketImpl(type, serverName, channel.getName(), message, new ArrayList<>());
+    private void outbound(Channel channel, ChatMessagePacketImpl packet) {
+        if (channel.isPublish()) send(packet);
+        else localcastPacket(packet);
+    }
+
+    private void send(ChatMessagePacket packet) {
+        var channel = packet.getChannel();
         var mq = mqChannels.entrySet()
                 .stream()
-                .filter(e -> e.getKey().equals(channel))
+                .filter(e -> e.getKey().getName().equals(channel))
                 .findAny()
                 .map(Map.Entry::getValue)
                 .orElse(null);
 
         if (mq == null) {
-            getLogger().warning("No MQ binding found for " + channel);
+            getLogger().warning("No MQ binding found for channel " + channel);
             return;
         }
 
@@ -540,7 +551,12 @@ public class ChatModLite extends JavaPlugin implements Listener {
         var content     = new ChatMessageParser().parse(msg);
         var basicPlayer = com.ampznetwork.libmod.api.entity.Player.basic(playerId, player.getName());
         var message     = new ChatMessage(basicPlayer, player.getDisplayName(), msg, content);
-        send(channel, PacketType.CHAT, message);
+        var packet = new ChatMessagePacketImpl(PacketType.CHAT,
+                serverName,
+                channel.getName(),
+                message,
+                new ArrayList<>());
+        outbound(channel, packet);
         return text("Message shouted: ").append(content);
     }
 
