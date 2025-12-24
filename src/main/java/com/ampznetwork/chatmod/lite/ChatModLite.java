@@ -247,49 +247,6 @@ public class ChatModLite extends JavaPlugin implements Listener {
         getServer().getPluginManager().registerEvents(this, this);
     }
 
-    private Component formatMessage(String source, String channelName, OfflinePlayer sender, Component content) {
-        var raw   = LegacyComponentSerializer.legacyAmpersand().serialize(content);
-        var fixes = formattingScheme.split("%message%");
-        var adapter = SoftDepend.type("me.clip.placeholderapi.PlaceholderAPI")
-                .map($ -> PlaceholderAdapter.Hook)
-                .orElse(PlaceholderAdapter.Native);
-        var prefix = adapter.applyPlaceholders(source, channelName, sender, fixes[0]);
-        var suffix = fixes.length > 1 ? adapter.applyPlaceholders(serverName, channelName, sender, fixes[1]) : "";
-        return LegacyComponentSerializer.legacyAmpersand().deserialize(prefix + raw + suffix);
-    }
-
-    private void localcastPacket(ChatMessagePacket packet) {
-        var channelOpt = channel(packet.getChannel());
-        if (channelOpt.isEmpty()) {
-            getLogger().warning("Received message for nonexistent channel: " + packet.getChannel());
-            return;
-        }
-        var channel = channelOpt.get();
-
-        var       message   = packet.getMessage();
-        var       sender    = message.getSender();
-        Component formatted = message.getFullText();
-
-        if (sender != null) {
-            var player = Bukkit.getOfflinePlayer(sender.getId());
-            formatted = formatMessage(packet.getSource(), channel.getAlternateName(), player, formatted);
-        }
-
-        localcast(channel, formatted);
-    }
-
-    private void localcast(Channel channel, Component component) {
-        final var bungeeComponent = BungeeComponentSerializer.get().serialize(component);
-        final var server = getServer();
-        channel.allPlayerIDs()
-                .map(server::getPlayer)
-                .distinct()
-                .filter(Objects::nonNull)
-                .filter(player -> hasAccess(player.getUniqueId(), channel))
-                .map(Player::spigot)
-                .forEach(player -> player.sendMessage(bungeeComponent));
-    }
-
     private com.ampznetwork.libmod.api.entity.Player getOrCreatePlayer(Player player) {
         return players.computeIfAbsent(player.getUniqueId(),
                 k -> com.ampznetwork.libmod.api.entity.Player.basic(k, player.getName()));
@@ -379,6 +336,7 @@ public class ChatModLite extends JavaPlugin implements Listener {
             }
         }
      */
+
     private void execAndRespond(@NotNull CommandSender sender, Supplier<ComponentLike> exec) {
         try {
             ComponentLike component;
@@ -392,6 +350,17 @@ public class ChatModLite extends JavaPlugin implements Listener {
             sender.sendMessage(ChatColor.RED + "An internal error occurred");
             getLogger().log(Level.WARNING, "Could not execute command", t);
         }
+    }
+
+    private Component formatMessage(String source, String channelName, OfflinePlayer sender, Component content) {
+        var raw   = LegacyComponentSerializer.legacyAmpersand().serialize(content);
+        var fixes = formattingScheme.split("%message%");
+        var adapter = SoftDepend.type("me.clip.placeholderapi.PlaceholderAPI")
+                .map($ -> PlaceholderAdapter.Hook)
+                .orElse(PlaceholderAdapter.Native);
+        var prefix = adapter.applyPlaceholders(source, channelName, sender, fixes[0]);
+        var suffix = fixes.length > 1 ? adapter.applyPlaceholders(serverName, channelName, sender, fixes[1]) : "";
+        return LegacyComponentSerializer.legacyAmpersand().deserialize(prefix + raw + suffix);
     }
 
     private void sendToPlayer(ComponentLike component, @NotNull Player player) {
@@ -419,6 +388,38 @@ public class ChatModLite extends JavaPlugin implements Listener {
         }
 
         mq.send(packet);
+    }
+
+    private void localcastPacket(ChatMessagePacket packet) {
+        var channelOpt = channel(packet.getChannel());
+        if (channelOpt.isEmpty()) {
+            getLogger().warning("Received message for nonexistent channel: " + packet.getChannel());
+            return;
+        }
+        var channel = channelOpt.get();
+
+        var       message   = packet.getMessage();
+        var       sender    = message.getSender();
+        Component formatted = message.getFullText();
+
+        if (sender != null) {
+            var player = Bukkit.getOfflinePlayer(sender.getId());
+            formatted = formatMessage(packet.getSource(), channel.getAlternateName(), player, formatted);
+        }
+
+        localcast(channel, formatted);
+    }
+
+    private void localcast(Channel channel, Component component) {
+        final var bungeeComponent = BungeeComponentSerializer.get().serialize(component);
+        final var server          = getServer();
+        channel.allPlayerIDs()
+                .map(server::getPlayer)
+                .distinct()
+                .filter(Objects::nonNull)
+                .filter(player -> hasAccess(player.getUniqueId(), channel))
+                .map(Player::spigot)
+                .forEach(player -> player.sendMessage(bungeeComponent));
     }
 
     private void requireAnyPermission(@NotNull CommandSender sender, @NotNull String perm) {
