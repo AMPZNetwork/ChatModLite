@@ -8,6 +8,7 @@ import com.ampznetwork.chatmod.api.model.protocol.internal.ChatMessagePacketImpl
 import com.ampznetwork.chatmod.api.model.protocol.internal.PacketType;
 import com.ampznetwork.chatmod.api.util.ChatMessageParser;
 import com.ampznetwork.chatmod.lite.lang.Words;
+import com.ampznetwork.chatmod.lite.model.CachedSubscriptions;
 import com.ampznetwork.chatmod.lite.model.CommandException;
 import com.ampznetwork.chatmod.lite.model.JacksonPacketConverter;
 import com.ampznetwork.chatmod.lite.model.PermissionException;
@@ -20,6 +21,7 @@ import lombok.NoArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
+import lombok.extern.slf4j.Slf4j;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.ComponentLike;
 import net.kyori.adventure.text.TextComponent;
@@ -43,6 +45,11 @@ import org.comroid.commands.model.permission.MinecraftPermissionAdapter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -61,6 +68,7 @@ import static java.util.Collections.*;
 import static net.kyori.adventure.text.Component.*;
 import static net.kyori.adventure.text.format.NamedTextColor.*;
 
+@Slf4j
 @Getter
 @NoArgsConstructor
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -190,6 +198,8 @@ public class ChatModLite extends JavaPlugin implements Listener {
     @Override
     @SneakyThrows
     public void onDisable() {
+        saveSubscriptions();
+
         // stop accepting events
         channels.clear();
 
@@ -228,6 +238,20 @@ public class ChatModLite extends JavaPlugin implements Listener {
         }
         getLogger().info("Loaded %d channels".formatted(channels.size()));
 
+        try (var fis = new FileInputStream(subscriptionsFile())) {
+            objectMapper.readValue(fis, CachedSubscriptions.class)
+                    .entries()
+                    .forEach(entry -> channel(entry.name()).ifPresent(channel -> channel.getSpyIDs()
+                            .addAll(entry.spies())));
+            getLogger().info("Loaded %d channel subscriptions".formatted(channels.stream()
+                    .mapToLong(channel -> channel.getSpyIDs().size())
+                    .sum()));
+        } catch (FileNotFoundException ignored) {
+            getLogger().warning("No cached subscriptions found");
+        } catch (IOException e) {
+            getLogger().log(Level.WARNING, "Failed to load cached subscriptions", e);
+        }
+
         var exchange = rabbit.exchange("minecraft", "topic");
         for (var channel : channels) {
             var route = exchange.route(Util.Kyori.sanitizePlain(serverName + ".chat." + channel.getName())
@@ -242,6 +266,10 @@ public class ChatModLite extends JavaPlugin implements Listener {
         compatibilityMode = cfg.getBoolean("compatibility.listeners", false);
 
         getServer().getPluginManager().registerEvents(this, this);
+    }
+
+    private File subscriptionsFile() {
+        return new File(getDataFolder(), "spies.json");
     }
 
     private Component formatMessage(String channelName, OfflinePlayer sender, Component content) {
@@ -496,14 +524,18 @@ public class ChatModLite extends JavaPlugin implements Listener {
                 .findAny()
                 .orElseThrow(() -> CommandException.noSuchChannel(channelName));
         var state = channel.getSpyIDs().contains(playerId);
-        if (state) {
-            if (channel.getSpyIDs().remove(playerId))
-                return text("You stopped spying on ", GOLD).append(channel.toComponent(playerId));
-            else throw CommandException.unsuccessful("could not unspy on channel " + channelName);
-        } else {
-            if (channel.getSpyIDs().add(playerId))
-                return text("You are spying on ", GOLD).append(channel.toComponent(playerId));
-            else throw CommandException.unsuccessful("could not spy on channel " + channelName);
+        try {
+            if (state) {
+                if (channel.getSpyIDs().remove(playerId))
+                    return text("You stopped spying on ", GOLD).append(channel.toComponent(playerId));
+                else throw CommandException.unsuccessful("could not unspy on channel " + channelName);
+            } else {
+                if (channel.getSpyIDs().add(playerId))
+                    return text("You are spying on ", GOLD).append(channel.toComponent(playerId));
+                else throw CommandException.unsuccessful("could not spy on channel " + channelName);
+            }
+        } finally {
+            saveSubscriptions();
         }
     }
 
@@ -519,5 +551,18 @@ public class ChatModLite extends JavaPlugin implements Listener {
         var message     = new ChatMessage(basicPlayer, player.getDisplayName(), msg, content);
         send(channel, PacketType.CHAT, message);
         return text("Message shouted: ").append(content);
+    }
+
+    private void saveSubscriptions() {
+        var entries = channels.stream()
+                .map(channel -> new CachedSubscriptions.ChannelEntry(channel.getName(),
+                        List.copyOf(channel.getSpyIDs())))
+                .toList();
+        var subscriptions = new CachedSubscriptions(entries);
+        try (var fos = new FileOutputStream(subscriptionsFile())) {
+            objectMapper.writeValue(fos, subscriptions);
+        } catch (IOException e) {
+            getLogger().log(Level.WARNING, "Could not save subscriptions to " + subscriptionsFile(), e);
+        }
     }
 }

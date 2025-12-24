@@ -1,6 +1,5 @@
 # basic configuration
-server:
-  name: '&aMC'
+server.name: '&aMC'
 
 # rabbitmq uri
 modules.rabbitmq.rabbitUri: amqp://guest:guest@localhost:5672
@@ -25,15 +24,12 @@ channels:
       display: "&4staff"
       permission: chat.channel.staff
 
-# formatter configuration
-formatting:
   # changes the basic format of the message
   # "%server_name%", "%player_name%" and "%message%" are special format strings that are always available
   # otherwise there is optional PlaceholderAPI support
-  scheme: "&7[%server_name%&7] #&6%channel_name%&7 <%player_name%&7> &r%message%"
+formatting.scheme: "&7[%server_name%&7] #&6%channel_name%&7 <%player_name%&7> &r%message%"
 
-compatibility:
   # enhanced listener compatibility mode
   # enable this only if you are experiencing issues with moderation plugins
-  # enabling this will partially break clickable urls and similar features
-  listeners: false
+# enabling this will partially break clickable urls and similar features
+compatibility.listeners: false
