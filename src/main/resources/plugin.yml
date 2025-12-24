@@ -51,6 +51,27 @@ permissions:
           chatmod.channel.join:
             description: Permission for the /chatmod:channel join command
             default: true
+          chatmod.channel.leave:
+            description: Permission for the /chatmod:channel leave command
+            default: true
           chatmod.channel.spy:
             description: Permission for the /chatmod:channel spy command
+            default: op
+  chat:
+    description: Chat meta permission root
+    default: false
+    children:
+      chat.channel:
+        description: Allows listening to a channel
+        default: false
+        children:
+          chat.channel.*:
+            description: Access to all channels
+            default: op
+      chat.autospy:
+        description: Automatically spies on a certain channel
+        default: false
+        children:
+          chat.autospy.*:
+            description: Automatically spy on all channels
             default: op

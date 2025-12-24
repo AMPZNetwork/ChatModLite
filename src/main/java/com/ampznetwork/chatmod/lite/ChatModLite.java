@@ -178,20 +178,20 @@ public class ChatModLite extends JavaPlugin implements Listener {
     ) {
         return switch (args.length) {
             case 0 -> List.of("reload", "status", "channel", "shout");
-            case 1 -> switch (args[0]) {
+            case 1 -> switch (alias) {
                 case "channel" -> List.of("list", "info", "join", "leave", "spy");
                 case "shout" -> channelNames(sender);
                 default -> emptyList();
             };
-            case 2 -> switch (args[0]) {
-                case "channel" -> switch (args[1]) {
+            case 2 -> switch (alias) {
+                case "channel" -> switch (args[0]) {
                     case "join", "spy" -> channelNames(sender);
                     default -> emptyList();
                 };
-                case "shout" -> channelNames(sender).contains(args[1]) ? List.of("<message>") : emptyList();
+                case "shout" -> channelNames(sender).contains(args[0]) ? List.of("<message>") : emptyList();
                 default -> emptyList();
             };
-            default -> "shout".equals(args[0]) ? List.of("<message>") : emptyList();
+            default -> "shout".equals(alias) ? List.of("<message>") : emptyList();
         };
     }
 
@@ -395,7 +395,11 @@ public class ChatModLite extends JavaPlugin implements Listener {
     }
 
     private List<String> channelNames(CommandSender sender) {
-        if (sender instanceof Player player) return channels(player).map(ChatModules.NamedBaseConfig::getName).toList();
+        if (sender instanceof Player player) return channels.stream().filter(channel -> {
+            var permission = channel.getPermission();
+            return permission == null || permissionAdapter.checkPermission(player.getUniqueId(), permission)
+                    .toBooleanOrElse(false);
+        }).map(ChatModules.NamedBaseConfig::getName).toList();
         return emptyList();
     }
 
