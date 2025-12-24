@@ -152,7 +152,7 @@ public class ChatModLite extends JavaPlugin implements Listener {
                 default:
                     switch (label) {
                         case "shout", "sh":
-                            channelName = args[1];
+                            channelName = args[0];
                             var msg = Arrays.stream(args).skip(1).collect(Collectors.joining(" "));
                             execAndRespond(sender, () -> shout(sender, channelName, msg));
                             break;
