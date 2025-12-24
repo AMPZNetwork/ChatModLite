@@ -306,8 +306,7 @@ public class ChatModLite extends JavaPlugin implements Listener {
     private void localcast(Channel channel, Component component) {
         final var bungeeComponent = BungeeComponentSerializer.get().serialize(component);
         final var server = getServer();
-        channel.getPlayerIDs()
-                .stream()
+        channel.allPlayerIDs()
                 .map(server::getPlayer)
                 .distinct()
                 .filter(Objects::nonNull)
