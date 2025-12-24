@@ -302,7 +302,12 @@ public class ChatModLite extends JavaPlugin implements Listener {
 
         if (channels.isEmpty() || channels.stream().anyMatch(chl -> chl.getPlayerIDs().contains(id))) return;
 
-        channels.getFirst().getPlayerIDs().add(id);
+        // join init channel
+        var first = channels.getFirst();
+        first.getPlayerIDs().add(id);
+        first.getSpyIDs().add(id);
+
+        // auto-spy channels
         channels.stream()
                 .filter(channel -> permissionAdapter.checkPermissionOrOp(id, "chat.autospy." + channel.getName(), true))
                 .peek(channel -> {
