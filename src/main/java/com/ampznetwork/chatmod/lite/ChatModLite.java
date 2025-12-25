@@ -28,14 +28,19 @@ import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.OfflinePlayer;
+import org.bukkit.advancement.Advancement;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
+import org.bukkit.event.player.PlayerAdvancementDoneEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerKickEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.comroid.api.java.SoftDepend;
 import org.comroid.api.net.Rabbit;
@@ -257,8 +262,6 @@ public class ChatModLite extends JavaPlugin implements Listener {
         var player = event.getPlayer();
         var id     = player.getUniqueId();
 
-        if (channels.isEmpty() || channels.stream().anyMatch(chl -> chl.getPlayerIDs().contains(id))) return;
-
         // join init channel
         var first = channels.getFirst();
         first.getPlayerIDs().add(id);
@@ -274,6 +277,61 @@ public class ChatModLite extends JavaPlugin implements Listener {
                             channel.getName()));
                 })
                 .forEach(channel -> channel.getSpyIDs().add(id));
+
+        // send join message
+        var message = createJoinMessage(player);
+        var packet = new ChatMessagePacketImpl(PacketType.JOIN,
+                serverName,
+                first.getName(),
+                message,
+                List.of(serverName));
+        outbound(first, packet);
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void dispatch(PlayerQuitEvent event) {
+        var player = event.getPlayer();
+        var first  = channels.getFirst();
+
+        playerLeave(player, first);
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void dispatch(PlayerKickEvent event) {
+        var player = event.getPlayer();
+        var first  = channels.getFirst();
+
+        playerLeave(player, first);
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void dispatch(PlayerAdvancementDoneEvent event) {
+        var player = event.getPlayer();
+        var first  = channels.getFirst();
+
+        // send leave message
+        var message = createAdvancementMessage(player, event.getAdvancement());
+        var packet = new ChatMessagePacketImpl(PacketType.OTHER,
+                serverName,
+                first.getName(),
+                message,
+                List.of(serverName));
+        outbound(first, packet);
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void dispatch(PlayerDeathEvent event) {
+        var player = event.getEntity();
+        var first  = channels.getFirst();
+
+        // send leave message
+        var message = createDeathMessage(player, event.getDeathMessage());
+        var packet = new ChatMessagePacketImpl(PacketType.OTHER,
+                serverName,
+                first.getName(),
+                message,
+                List.of(serverName));
+        outbound(first, packet);
     }
 
     @EventHandler(priority = EventPriority.HIGH)
@@ -306,7 +364,7 @@ public class ChatModLite extends JavaPlugin implements Listener {
                         serverName,
                         channel.getName(),
                         message,
-                        new ArrayList<>());
+                        List.of());
                 outbound(channel, packet);
             } else {
                 getLogger().warning("Player %s has no access to channel %s".formatted(playerName, channel.getName()));
@@ -318,34 +376,19 @@ public class ChatModLite extends JavaPlugin implements Listener {
         }
     }
 
-    /*
-        @EventHandler(priority = EventPriority.MONITOR)
-        public void dispatch(PlayerJoinEvent event) {
-            try {
-                playerJoin(event.getPlayer().getUniqueId(), createEventDelegate(event, DELEGATE_PROPERTY_JOIN));
-            } catch (Throwable t) {
-                mod.getLogger().log(Level.WARNING, "Error in event handler", t);
-            }
-        }
+    private void playerLeave(Player player, Channel channel) {
+        var id = player.getUniqueId();
+        for (var each : channels) each.getPlayerIDs().remove(id);
 
-        @EventHandler(priority = EventPriority.MONITOR)
-        public void dispatch(PlayerQuitEvent event) {
-            try {
-                playerLeave(event.getPlayer().getUniqueId(), createEventDelegate(event, DELEGATE_PROPERTY_QUIT));
-            } catch (Throwable t) {
-                mod.getLogger().log(Level.WARNING, "Error in event handler", t);
-            }
-        }
-
-        @EventHandler(priority = EventPriority.MONITOR)
-        public void dispatch(PlayerKickEvent event) {
-            try {
-                playerLeave(event.getPlayer().getUniqueId(), createEventDelegate(event, DELEGATE_PROPERTY_KICK));
-            } catch (Throwable t) {
-                mod.getLogger().log(Level.WARNING, "Error in event handler", t);
-            }
-        }
-     */
+        // send leave message
+        var message = createLeaveMessage(player);
+        var packet = new ChatMessagePacketImpl(PacketType.LEAVE,
+                serverName,
+                channel.getName(),
+                message,
+                List.of(serverName));
+        outbound(channel, packet);
+    }
 
     private void execAndRespond(@NotNull CommandSender sender, Supplier<ComponentLike> exec) {
         try {
@@ -401,6 +444,8 @@ public class ChatModLite extends JavaPlugin implements Listener {
     }
 
     private void localcastPacket(ChatMessagePacket packet) {
+        if (packet.getRoute().contains(serverName)) return;
+
         var channelOpt = channel(packet.getChannel());
         if (channelOpt.isEmpty()) {
             getLogger().warning("Received message for nonexistent channel: " + packet.getChannel());
@@ -567,11 +612,7 @@ public class ChatModLite extends JavaPlugin implements Listener {
         var content     = new ChatMessageParser().parse(msg);
         var basicPlayer = com.ampznetwork.libmod.api.entity.Player.basic(playerId, player.getName());
         var message     = new ChatMessage(basicPlayer, player.getDisplayName(), msg, content);
-        var packet = new ChatMessagePacketImpl(PacketType.CHAT,
-                serverName,
-                channel.getName(),
-                message,
-                new ArrayList<>());
+        var packet = new ChatMessagePacketImpl(PacketType.CHAT, serverName, channel.getName(), message, List.of());
         outbound(channel, packet);
         return text("Message shouted: ").append(content);
     }
@@ -585,6 +626,42 @@ public class ChatModLite extends JavaPlugin implements Listener {
                 text("\n - Permission: ", AQUA)).append(text(permission, YELLOW));
         var state = channel.getState(playerId);
         return text.append(text("\n - Status: ")).append(state.toComponent());
+    }
+
+    private ChatMessage createJoinMessage(Player player) {
+        var playerName = player.getName();
+        return new ChatMessage(com.ampznetwork.libmod.api.entity.Player.basic(player.getUniqueId(), playerName),
+                playerName,
+                "> ▶️ Joined the game",
+                text("joined the game", YELLOW));
+    }
+
+    private ChatMessage createLeaveMessage(Player player) {
+        var playerName = player.getName();
+        return new ChatMessage(com.ampznetwork.libmod.api.entity.Player.basic(player.getUniqueId(), playerName),
+                playerName,
+                "> ⏹️ Left the game",
+                text("left the game", YELLOW));
+    }
+
+    private ChatMessage createAdvancementMessage(Player player, Advancement advancement) {
+        var playerName = player.getName();
+        var display    = advancement.getDisplay();
+        var displayText = display == null
+                          ? "> \uD83C\uDFC6 Completed an advancement"
+                          : "> \uD83C\uDFC6 Completed the advancement \"" + display.getTitle() + "\"\n> `" + display.getDescription() + "`";
+        return new ChatMessage(com.ampznetwork.libmod.api.entity.Player.basic(player.getUniqueId(), playerName),
+                playerName,
+                displayText,
+                text(displayText, YELLOW));
+    }
+
+    private ChatMessage createDeathMessage(Player player, String deathMessage) {
+        var playerName = player.getName();
+        return new ChatMessage(com.ampznetwork.libmod.api.entity.Player.basic(player.getUniqueId(), playerName),
+                playerName,
+                "> ☠️ " + deathMessage,
+                text(deathMessage, YELLOW));
     }
 
     private boolean hasAccess(UUID id, Channel channel) {
