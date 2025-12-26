@@ -306,11 +306,14 @@ public class ChatModLite extends JavaPlugin implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void dispatch(PlayerAdvancementDoneEvent event) {
+        var advancement = event.getAdvancement();
+        if (advancement.getDisplay() == null) return;
+
         var player = event.getPlayer();
         var first  = channels.getFirst();
 
         // send leave message
-        var message = createAdvancementMessage(player, event.getAdvancement());
+        var message = createAdvancementMessage(player, advancement);
         var packet = new ChatMessagePacketImpl(PacketType.OTHER,
                 serverName,
                 first.getName(),
