@@ -307,7 +307,8 @@ public class ChatModLite extends JavaPlugin implements Listener {
     @EventHandler(priority = EventPriority.MONITOR)
     public void dispatch(PlayerAdvancementDoneEvent event) {
         var advancement = event.getAdvancement();
-        if (advancement.getDisplay() == null) return;
+        var display = advancement.getDisplay();
+        if (display == null || display.isHidden()) return;
 
         var player = event.getPlayer();
         var first  = channels.getFirst();
@@ -650,9 +651,8 @@ public class ChatModLite extends JavaPlugin implements Listener {
     private ChatMessage createAdvancementMessage(Player player, Advancement advancement) {
         var playerName = player.getName();
         var display    = advancement.getDisplay();
-        var displayText = display == null
-                          ? "> \uD83C\uDFC6 Completed an advancement"
-                          : "> \uD83C\uDFC6 Completed the advancement \"" + display.getTitle() + "\"\n> `" + display.getDescription() + "`";
+        assert display != null : "should be unreachable";
+        var displayText = "> \uD83C\uDFC6 Completed the advancement \"" + display.getTitle() + "\"\n> `" + display.getDescription() + "`";
         return new ChatMessage(com.ampznetwork.libmod.api.entity.Player.basic(player.getUniqueId(), playerName),
                 playerName,
                 displayText,
