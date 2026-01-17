@@ -1,0 +1,69 @@
+package com.ampznetwork.chatmod.lite.config;
+
+import com.ampznetwork.chatmod.lite.model.Config;
+import com.ampznetwork.chatmod.lite.model.abstr.ChatModConfig;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hypixel.hytale.server.core.util.io.BlockingDiskFile;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
+import lombok.experimental.NonFinal;
+import org.comroid.api.net.Rabbit;
+
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.file.Path;
+
+@Value
+@EqualsAndHashCode(callSuper = true)
+public class HytaleConfigFile extends BlockingDiskFile implements ChatModConfig {
+    ObjectMapper objectMapper;
+    @NonFinal Config obj;
+    @NonFinal Rabbit rabbit;
+
+    public HytaleConfigFile() {
+        super(Path.of(".", "config", "chatmod.json"));
+
+        this.objectMapper = new ObjectMapper();
+    }
+
+    @Override
+    public String getServerName() {
+        return obj.server().name();
+    }
+
+    @Override
+    public String getFormattingScheme() {
+        return obj.formatting().scheme();
+    }
+
+    @Override
+    protected void read(BufferedReader bufferedReader) throws IOException {
+        var oldRabbit = rabbit;
+
+        obj = objectMapper.readValue(bufferedReader, Config.class);
+
+        refreshRabbit:
+        {
+            var newRabbitUri = obj.modules().rabbitMq().rabbitUri();
+            if (oldRabbit.getUri().toString().equals(newRabbitUri)) break refreshRabbit;
+            rabbit = Rabbit.of(newRabbitUri).assertion();
+        }
+    }
+
+    @Override
+    protected void write(BufferedWriter bufferedWriter) throws IOException {
+        objectMapper.writeValue(bufferedWriter, obj);
+    }
+
+    @Override
+    protected void create(BufferedWriter bufferedWriter) throws IOException {
+        try (var is = HytaleConfigFile.class.getResourceAsStream("/hytale.config.json")) {
+            if (is == null) return;
+            try (var isr = new InputStreamReader(is)) {
+                isr.transferTo(bufferedWriter);
+            }
+        }
+    }
+}

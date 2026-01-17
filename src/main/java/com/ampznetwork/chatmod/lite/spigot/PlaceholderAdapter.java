@@ -1,4 +1,4 @@
-package com.ampznetwork.chatmod.lite.model;
+package com.ampznetwork.chatmod.lite.spigot;
 
 import com.ampznetwork.libmod.api.entity.Player;
 import me.clip.placeholderapi.PlaceholderAPI;

@@ -1,0 +1,32 @@
+{
+  "server": {
+    "name": "§aHYTALE"
+  },
+  "modules": {
+    "rabbitmq": {
+      "rabbitUri": "amqp://guest:guest@localhost:5672"
+    }
+  },
+  "channels": [
+    {
+      "name": "global",
+      "alias": "g",
+      "display": "&6global"
+    },
+    {
+      "name": "local",
+      "alias": "l",
+      "display": "&2local",
+      "publish": false
+    },
+    {
+      "name": "staff",
+      "alias": "s",
+      "display": "&4staff",
+      "permission": "chat.channel.staff"
+    }
+  ],
+  "formatting": {
+    "scheme": "&7[%server_name%&7] #&6%channel_name%&7 <%player_name%&7> &r%message%"
+  }
+}

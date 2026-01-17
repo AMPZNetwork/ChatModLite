@@ -1,0 +1,18 @@
+{
+  "Group": "AMPZ",
+  "Name": "ChatModLite",
+  "Version": "1",
+  "Description": "Mod to link Chat with other servers using RabbitMQ",
+  "Authors": [
+    {
+      "Name": "Kaleidox"
+    }
+  ],
+  "Website": "https://github.com/AMPZNetwork/ChatModLite",
+  "ServerVersion": "*",
+  "Dependencies": {},
+  "OptionalDependencies": {},
+  "DisabledByDefault": false,
+  "Main": "com.ampznetwork.chatmod.lite.hytale.ChatModLiteHytale",
+  "IncludesAssetPack": false
+}

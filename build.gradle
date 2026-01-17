@@ -44,6 +44,8 @@ dependencies {
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.18.0'
     implementation 'com.rabbitmq:amqp-client:5.18.0'
 
+    compileOnly fileTree(dir: "$projectDir/libs/hytale", include: ['*.jar'])
+
     compileOnly 'me.clip:placeholderapi:2.+'
 
     compileOnly 'org.projectlombok:lombok:+'
@@ -93,6 +95,13 @@ tasks.create('simpleTest', Copy) {
     dependsOn tasks.shadowJar
     from tasks.shadowJar.outputs.files.singleFile
     into "$rootDir/run/spigot/plugins"
+    rename { 'ChatModLite.jar' }
+}
+
+tasks.create('hytaleTest', Copy) {
+    dependsOn tasks.shadowJar
+    from tasks.shadowJar.outputs.files.singleFile
+    into "$rootDir/run/hytale/mods"
     rename { 'ChatModLite.jar' }
 }
 

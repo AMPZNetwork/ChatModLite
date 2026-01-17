@@ -1,0 +1,20 @@
+package com.ampznetwork.chatmod.lite.hytale.command;
+
+import com.hypixel.hytale.server.core.command.system.AbstractCommand;
+import com.hypixel.hytale.server.core.command.system.CommandContext;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.concurrent.CompletableFuture;
+
+public class ShoutCommand extends AbstractCommand {
+    public ShoutCommand() {
+        super("shout", "Shout into a channel");
+    }
+
+    @Override
+    protected @Nullable CompletableFuture<Void> execute(@NotNull CommandContext commandContext) {
+        //commandContext.sendMessage();
+        return CompletableFuture.completedFuture(null); // todo
+    }
+}

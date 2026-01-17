@@ -1,4 +1,4 @@
-package com.ampznetwork.chatmod.lite.model;
+package com.ampznetwork.chatmod.lite.model.exception;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;

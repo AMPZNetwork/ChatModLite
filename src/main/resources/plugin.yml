@@ -1,6 +1,6 @@
 name: ChatModLite
 version: '1'
-main: com.ampznetwork.chatmod.lite.ChatModLite
+main: com.ampznetwork.chatmod.lite.spigot.ChatModLiteSpigot
 api-version: '1.21'
 load: STARTUP
 website: https://github.com/AMPZNetwork/ChatModLite
