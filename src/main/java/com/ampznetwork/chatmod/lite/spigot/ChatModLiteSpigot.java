@@ -271,34 +271,8 @@ public class ChatModLiteSpigot extends JavaPlugin
     @EventHandler(priority = EventPriority.MONITOR)
     public void dispatch(PlayerJoinEvent event) {
         var player = basicPlayer(event.getPlayer());
-        var id     = player.getId();
 
-        // join init channel
-        var first = core.getChannels().getFirst();
-        first.getPlayerIDs().add(id);
-        first.getSpyIDs().add(id);
-
-        // auto-spy channels
-        core.getChannels()
-                .stream()
-                .filter(channel -> core.getPermissionAdapter()
-                        .checkPermissionOrOp(id, "chat.autospy." + channel.getName(), true))
-                .peek(channel -> {
-                    if (!core.hasAccess(id,
-                            channel)) getLogger().warning(("Player %s has auto-join permission for channel %s but does not have access to the " + "channel").formatted(
-                            player.getName(),
-                            channel.getName()));
-                })
-                .forEach(channel -> channel.getSpyIDs().add(id));
-
-        // send join message
-        var message = core.createJoinMessage(player);
-        var packet = new ChatMessagePacketImpl(PacketType.JOIN,
-                serverName,
-                first.getName(),
-                message,
-                List.of(serverName));
-        core.outbound(first, packet);
+        core.playerJoin(player);
     }
 
     @EventHandler(priority = EventPriority.MONITOR)

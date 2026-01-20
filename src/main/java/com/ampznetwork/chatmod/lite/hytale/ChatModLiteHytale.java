@@ -15,6 +15,8 @@ import com.ampznetwork.chatmod.lite.model.abstr.PlayerAdapter;
 import com.ampznetwork.libmod.api.entity.Player;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.event.events.player.PlayerChatEvent;
+import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
+import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -55,10 +57,25 @@ public class ChatModLiteHytale extends JavaPlugin implements ChatDispatcher, Pla
 
         var eventRegistry = getEventRegistry();
         eventRegistry.registerAsyncGlobal(PlayerChatEvent.class, event -> event.thenApply(this::handleChat));
+        eventRegistry.registerGlobal(PlayerConnectEvent.class, this::handleJoin);
+        eventRegistry.registerGlobal(PlayerDisconnectEvent.class, this::handleLeave);
 
         var commandRegistry = getCommandRegistry();
         commandRegistry.registerCommand(new ShoutCommand());
         commandRegistry.registerCommand(new ChannelCommand());
+    }
+
+    private void handleJoin(PlayerConnectEvent event) {
+        var player = getPlayer(event.getPlayerRef().getUuid());
+
+        core.playerJoin(player);
+    }
+
+    private void handleLeave(PlayerDisconnectEvent event) {
+        var player = getPlayer(event.getPlayerRef().getUuid());
+        var first  = core.getChannels().getFirst();
+
+        core.playerLeave(player, first);
     }
 
     @Override

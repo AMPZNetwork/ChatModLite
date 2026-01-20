@@ -60,6 +60,38 @@ public class ChatModCore implements ChannelConfigProvider {
         return channelProvider.getChannels();
     }
 
+    public void playerJoin(Player player) {
+        var id = player.getId();
+
+        // join init channel
+        var first = getChannels().getFirst();
+        first.getPlayerIDs().add(id);
+        first.getSpyIDs().add(id);
+
+        // auto-spy channels
+        getChannels()
+                .stream()
+                .filter(channel -> getPermissionAdapter()
+                        .checkPermissionOrOp(id, "chat.autospy." + channel.getName(), true))
+                .peek(channel -> {
+                    if (!hasAccess(id,
+                            channel)) log.warning(("Player %s has auto-join permission for channel %s but does not " +
+                                                   "have access to the " + "channel").formatted(
+                            player.getName(),
+                            channel.getName()));
+                })
+                .forEach(channel -> channel.getSpyIDs().add(id));
+
+        // send join message
+        var message = createJoinMessage(player);
+        var packet = new ChatMessagePacketImpl(PacketType.JOIN,
+                config.getServerName(),
+                first.getName(),
+                message,
+                List.of(config.getServerName()));
+        outbound(first, packet);
+    }
+
     public void playerLeave(Player player, Channel channel) {
         var id = player.getId();
         for (var each : channelProvider.getChannels()) each.getPlayerIDs().remove(id);
