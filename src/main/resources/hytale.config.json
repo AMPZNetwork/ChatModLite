@@ -3,7 +3,7 @@
     "name": "§aHYTALE"
   },
   "modules": {
-    "rabbitmq": {
+    "rabbitMq": {
       "rabbitUri": "amqp://guest:guest@localhost:5672"
     }
   },

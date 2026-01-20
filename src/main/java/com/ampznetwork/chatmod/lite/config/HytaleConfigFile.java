@@ -25,6 +25,11 @@ public class HytaleConfigFile extends BlockingDiskFile implements ChatModConfig 
     public HytaleConfigFile() {
         super(Path.of(".", "config", "chatmod.json"));
 
+        var dir = Path.of(".", "config").toFile();
+        if (!dir.exists())
+            if (!dir.mkdirs() && dir.exists())
+                throw new RuntimeException("Could not create config dir");
+
         this.objectMapper = new ObjectMapper();
     }
 
@@ -47,7 +52,7 @@ public class HytaleConfigFile extends BlockingDiskFile implements ChatModConfig 
         refreshRabbit:
         {
             var newRabbitUri = obj.modules().rabbitMq().rabbitUri();
-            if (oldRabbit.getUri().toString().equals(newRabbitUri)) break refreshRabbit;
+            if (oldRabbit != null && oldRabbit.getUri().toString().equals(newRabbitUri)) break refreshRabbit;
             rabbit = Rabbit.of(newRabbitUri).assertion();
         }
     }

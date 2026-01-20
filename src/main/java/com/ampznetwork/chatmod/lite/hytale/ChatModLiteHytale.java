@@ -15,6 +15,7 @@ import com.hypixel.hytale.server.core.event.events.player.PlayerChatEvent;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.Universe;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.extern.java.Log;
@@ -23,10 +24,8 @@ import net.kyori.adventure.text.ComponentLike;
 import net.kyori.adventure.text.TextComponent;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Stream;
 
 @Log
 @Value
@@ -34,7 +33,6 @@ import java.util.stream.Stream;
 public class ChatModLiteHytale extends JavaPlugin implements ChatDispatcher, PlayerAdapter, PacketCaster {
     HytaleConfigFile     config;
     ChatModCore          core;
-    Map<UUID, PlayerRef> playerRefs = new ConcurrentHashMap<>();
 
     public ChatModLiteHytale(@NotNull JavaPluginInit init) {
         super(init);
@@ -64,7 +62,8 @@ public class ChatModLiteHytale extends JavaPlugin implements ChatDispatcher, Pla
 
         var content = HytaleComponentSerializer.INSTANCE.serialize(((TextComponent) component.asComponent()));
         var message = new Message(content);
-        // todo
+
+        getPlayerRef(player.getId()).ifPresent(ref -> ref.sendMessage(message));
     }
 
     @Override
@@ -97,7 +96,7 @@ public class ChatModLiteHytale extends JavaPlugin implements ChatDispatcher, Pla
     }
 
     private PlayerChatEvent handleChat(PlayerChatEvent event) {
-        var player  = touch(event.getSender());
+        var player = getPlayer(event.getSender().getUuid());
         var channel = core.activeChannels(player).findAny().orElseGet(() -> core.getChannels().getFirst());
 
         var text = new ChatMessageParser().parse(event.getContent());
@@ -107,17 +106,7 @@ public class ChatModLiteHytale extends JavaPlugin implements ChatDispatcher, Pla
         return event;
     }
 
-    private Player touch(PlayerRef player) {
-        var playerId = player.getUuid();
-        playerRefs.compute(playerId, (k, v) -> player);
-        return getPlayer(playerId);
-    }
-
-    Stream<PlayerRef> getPlayerRef(UUID uuid) {
-        return playerRefs.entrySet()
-                .stream()
-                .filter(e -> e.getKey().equals(uuid))
-                .map(Map.Entry::getValue)
-                .filter(PlayerRef::isValid);
+    Optional<PlayerRef> getPlayerRef(UUID uuid) {
+        return Optional.ofNullable(Universe.get().getPlayer(uuid));
     }
 }
