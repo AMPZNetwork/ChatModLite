@@ -11,7 +11,10 @@
   "Website": "https://github.com/AMPZNetwork/ChatModLite",
   "ServerVersion": "*",
   "Dependencies": {},
-  "OptionalDependencies": {},
+  "OptionalDependencies": {
+    "Hytale:Universe": "*",
+    "Hytale:PermissionsModule": "*"
+  },
   "DisabledByDefault": false,
   "Main": "com.ampznetwork.chatmod.lite.hytale.ChatModLiteHytale",
   "IncludesAssetPack": false

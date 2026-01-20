@@ -8,7 +8,6 @@ import com.ampznetwork.chatmod.api.model.protocol.internal.ChatMessagePacketImpl
 import com.ampznetwork.chatmod.api.model.protocol.internal.PacketType;
 import com.ampznetwork.chatmod.api.util.ChatMessageParser;
 import com.ampznetwork.chatmod.lite.ChatModCore;
-import com.ampznetwork.chatmod.lite.model.JacksonPacketConverter;
 import com.ampznetwork.chatmod.lite.model.abstr.ChannelConfigProvider;
 import com.ampznetwork.chatmod.lite.model.abstr.ChatDispatcher;
 import com.ampznetwork.chatmod.lite.model.abstr.ChatModConfig;
@@ -248,15 +247,7 @@ public class ChatModLiteSpigot extends JavaPlugin
         }
         getLogger().info("Loaded %d channels".formatted(core.getChannels().size()));
 
-        var exchange = rabbit.exchange("minecraft", "topic");
-        for (var channel : core.getChannels()) {
-            if (!channel.isPublish()) continue;
-            var route = exchange.route(Util.Kyori.sanitizePlain(serverName + ".chat." + channel.getName())
-                    .toLowerCase(), "chat." + channel.getName(), new JacksonPacketConverter(core.getObjectMapper()));
-            route.subscribeData(this::localcastPacket);
-            core.getMqChannels().put(channel, route);
-        }
-        getLogger().info("Created %d RabbitMQ bindings".formatted(core.getMqChannels().size()));
+        core.loadMqChannels();
 
         formattingScheme = cfg.getString("formatting.scheme",
                 "&7[%server_name%&7] #&6%channel_name%&7 <%player_name%&7> &r%message%");

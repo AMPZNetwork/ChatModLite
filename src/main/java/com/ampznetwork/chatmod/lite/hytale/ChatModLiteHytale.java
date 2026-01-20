@@ -1,6 +1,9 @@
 package com.ampznetwork.chatmod.lite.hytale;
 
+import com.ampznetwork.chatmod.api.model.protocol.ChatMessage;
 import com.ampznetwork.chatmod.api.model.protocol.ChatMessagePacket;
+import com.ampznetwork.chatmod.api.model.protocol.internal.ChatMessagePacketImpl;
+import com.ampznetwork.chatmod.api.model.protocol.internal.PacketType;
 import com.ampznetwork.chatmod.api.util.ChatMessageParser;
 import com.ampznetwork.chatmod.lite.ChatModCore;
 import com.ampznetwork.chatmod.lite.config.HytaleConfigFile;
@@ -46,6 +49,7 @@ public class ChatModLiteHytale extends JavaPlugin implements ChatDispatcher, Pla
     @Override
     protected void setup() {
         config.syncLoad();
+        core.loadMqChannels();
 
         super.setup();
 
@@ -92,15 +96,19 @@ public class ChatModLiteHytale extends JavaPlugin implements ChatDispatcher, Pla
 
     @Override
     public Player getPlayer(UUID playerId) {
-        return Player.basic(playerId, "Hytale User"); // todo
+        var ref = Universe.get().getPlayer(playerId);
+        return Player.basic(playerId, ref != null ? ref.getUsername() : "Hytale User");
     }
 
     private PlayerChatEvent handleChat(PlayerChatEvent event) {
         var player = getPlayer(event.getSender().getUuid());
         var channel = core.activeChannels(player).findAny().orElseGet(() -> core.getChannels().getFirst());
 
-        var text = new ChatMessageParser().parse(event.getContent());
-        core.localcast(channel, text);
+        var text    = new ChatMessageParser().parse(event.getContent());
+        var message = new ChatMessage(player, event.getSender().getUsername(), event.getContent(), text);
+        var packet  = new ChatMessagePacketImpl(PacketType.CHAT, config.getServerName(), channel.getName(), message);
+
+        core.outbound(channel, packet);
 
         event.setCancelled(true);
         return event;

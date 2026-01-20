@@ -7,6 +7,7 @@ import com.ampznetwork.chatmod.api.model.protocol.internal.ChatMessagePacketImpl
 import com.ampznetwork.chatmod.api.model.protocol.internal.PacketType;
 import com.ampznetwork.chatmod.api.util.ChatMessageParser;
 import com.ampznetwork.chatmod.lite.lang.Words;
+import com.ampznetwork.chatmod.lite.model.JacksonPacketConverter;
 import com.ampznetwork.chatmod.lite.model.abstr.ChannelConfigProvider;
 import com.ampznetwork.chatmod.lite.model.abstr.ChatDispatcher;
 import com.ampznetwork.chatmod.lite.model.abstr.ChatModConfig;
@@ -91,7 +92,7 @@ public class ChatModCore implements ChannelConfigProvider {
         }
     }
 
-    public void outbound(Channel channel, ChatMessagePacketImpl packet) {
+    public void outbound(Channel channel, ChatMessagePacket packet) {
         if (channel.isPublish()) send(packet);
         else packetCaster.localcastPacket(packet);
     }
@@ -300,5 +301,17 @@ public class ChatModCore implements ChannelConfigProvider {
     public boolean hasAccess(UUID id, Channel channel) {
         return channel.getPermission() == null || permissionAdapter.checkPermissionOrOp(id,
                 "chat.channel." + channel.getName());
+    }
+
+    public void loadMqChannels() {
+        var exchange = config.getRabbit().exchange("minecraft", "topic");
+        for (var channel : getChannels()) {
+            if (!channel.isPublish()) continue;
+            var route = exchange.route(Util.Kyori.sanitizePlain(config.getServerName() + ".chat." + channel.getName())
+                    .toLowerCase(), "chat." + channel.getName(), new JacksonPacketConverter(getObjectMapper()));
+            route.subscribeData(packetCaster::localcastPacket);
+            getMqChannels().put(channel, route);
+        }
+        log.info("Created %d RabbitMQ bindings".formatted(getMqChannels().size()));
     }
 }
