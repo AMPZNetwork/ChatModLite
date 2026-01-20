@@ -270,7 +270,7 @@ public class ChatModLiteSpigot extends JavaPlugin
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void dispatch(PlayerJoinEvent event) {
-        var player = com.ampznetwork.libmod.api.entity.Player.basic(event.getPlayer());
+        var player = basicPlayer(event.getPlayer());
         var id     = player.getId();
 
         // join init channel
@@ -303,7 +303,7 @@ public class ChatModLiteSpigot extends JavaPlugin
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void dispatch(PlayerQuitEvent event) {
-        var player = com.ampznetwork.libmod.api.entity.Player.basic(event.getPlayer());
+        var player = basicPlayer(event.getPlayer());
         var first  = core.getChannels().getFirst();
 
         core.playerLeave(player, first);
@@ -311,7 +311,7 @@ public class ChatModLiteSpigot extends JavaPlugin
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void dispatch(PlayerKickEvent event) {
-        var player = com.ampznetwork.libmod.api.entity.Player.basic(event.getPlayer());
+        var player = basicPlayer(event.getPlayer());
         var first  = core.getChannels().getFirst();
 
         core.playerLeave(player, first);
@@ -323,7 +323,7 @@ public class ChatModLiteSpigot extends JavaPlugin
         var display = advancement.getDisplay();
         if (display == null || display.isHidden()) return;
 
-        var player = com.ampznetwork.libmod.api.entity.Player.basic(event.getPlayer());
+        var player = basicPlayer(event.getPlayer());
         var first  = core.getChannels().getFirst();
 
         // send leave message
@@ -338,7 +338,7 @@ public class ChatModLiteSpigot extends JavaPlugin
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void dispatch(PlayerDeathEvent event) {
-        var player = com.ampznetwork.libmod.api.entity.Player.basic(event.getEntity());
+        var player = basicPlayer(event.getEntity());
         var first  = core.getChannels().getFirst();
 
         // send leave message
@@ -411,14 +411,15 @@ public class ChatModLiteSpigot extends JavaPlugin
     }
 
     private com.ampznetwork.libmod.api.entity.Player requirePlayer(@NotNull CommandSender sender) {
-        if (sender instanceof Player player) return com.ampznetwork.libmod.api.entity.Player.basic(player);
+        if (sender instanceof Player player) return basicPlayer(player);
         throw new CommandException("Only players can execute this command");
     }
 
     @Override
     public com.ampznetwork.libmod.api.entity.Player getPlayer(UUID playerId) {
         var bukkitPlayer = getServer().getPlayer(playerId);
-        return com.ampznetwork.libmod.api.entity.Player.basic(Objects.requireNonNull(bukkitPlayer, "bukkitPlayer"));
+        return basicPlayer(Objects.requireNonNull(bukkitPlayer,
+                "bukkitPlayer"));
     }
 
     private Component formatMessage(String source, String channelName, OfflinePlayer player, Component content) {
@@ -452,5 +453,9 @@ public class ChatModLiteSpigot extends JavaPlugin
         }
 
         core.localcast(channel, formatted);
+    }
+
+    private com.ampznetwork.libmod.api.entity.Player basicPlayer(Player player) {
+        return com.ampznetwork.libmod.api.entity.Player.basic(player.getUniqueId(), player.getName());
     }
 }
