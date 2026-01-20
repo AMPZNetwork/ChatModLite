@@ -1,0 +1,16 @@
+<component name="ProjectRunConfigurationManager">
+    <configuration default="false" name="ChatModLite on Hytale" type="JarApplication">
+        <option name="JAR_PATH" value="$PROJECT_DIR$/run/hytale/Server/HytaleServer.jar"/>
+        <option name="VM_PARAMETERS" value="-Xmx2G"/>
+        <option name="PROGRAM_PARAMETERS" value="--assets Assets.zip"/>
+        <option name="WORKING_DIRECTORY" value="D:\dev\mc\ChatModLite\run\hytale"/>
+        <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true"/>
+        <option name="ALTERNATIVE_JRE_PATH" value="openjdk-25"/>
+        <envs>
+            <env name="DEBUG" value="true"/>
+        </envs>
+        <method v="2">
+            <option name="Gradle.BeforeRunTask" enabled="true" tasks="hytaleTest" externalProjectPath="$PROJECT_DIR$" vmOptions="" scriptParameters=""/>
+        </method>
+    </configuration>
+</component>

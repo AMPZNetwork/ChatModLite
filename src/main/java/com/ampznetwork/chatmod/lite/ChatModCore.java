@@ -7,6 +7,7 @@ import com.ampznetwork.chatmod.api.model.protocol.internal.ChatMessagePacketImpl
 import com.ampznetwork.chatmod.api.model.protocol.internal.PacketType;
 import com.ampznetwork.chatmod.api.util.ChatMessageParser;
 import com.ampznetwork.chatmod.lite.lang.Words;
+import com.ampznetwork.chatmod.lite.model.abstr.ChannelConfigProvider;
 import com.ampznetwork.chatmod.lite.model.abstr.ChatDispatcher;
 import com.ampznetwork.chatmod.lite.model.abstr.ChatModConfig;
 import com.ampznetwork.chatmod.lite.model.abstr.PacketCaster;
@@ -26,7 +27,6 @@ import org.comroid.commands.model.permission.PermissionAdapter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -44,19 +44,24 @@ import static net.kyori.adventure.text.format.NamedTextColor.*;
 
 @Log
 @Value
-public class ChatModCore {
+public class ChatModCore implements ChannelConfigProvider {
     ChatModConfig                                          config;
     ChatDispatcher                                         dispatcher;
     PlayerAdapter                                          playerAdapter;
     PermissionAdapter                                      permissionAdapter;
     PacketCaster                                           packetCaster;
+    ChannelConfigProvider channelProvider;
     ObjectMapper                                           objectMapper = new ObjectMapper();
-    List<Channel>                                          channels     = new ArrayList<>();
     Map<Channel, Rabbit.Exchange.Route<ChatMessagePacket>> mqChannels   = new ConcurrentHashMap<>();
+
+    @Override
+    public List<Channel> getChannels() {
+        return channelProvider.getChannels();
+    }
 
     public void playerLeave(Player player, Channel channel) {
         var id = player.getId();
-        for (var each : channels) each.getPlayerIDs().remove(id);
+        for (var each : channelProvider.getChannels()) each.getPlayerIDs().remove(id);
 
         // send leave message
         var message = createLeaveMessage(player);
@@ -126,20 +131,23 @@ public class ChatModCore {
     }
 
     public Optional<Channel> channel(String named) {
-        return channels.stream()
+        return channelProvider.getChannels()
+                .stream()
                 .filter(chl -> chl.getName().equalsIgnoreCase(named) || (chl.getAlias() != null && chl.getAlias()
                         .equalsIgnoreCase(named)))
                 .findAny();
     }
 
     public Stream<Channel> availableChannels(Player player) {
-        return channels.stream().filter(channel -> hasAccess(player.getId(), channel));
+        return channelProvider.getChannels().stream().filter(channel -> hasAccess(player.getId(), channel));
     }
 
     public Stream<Channel> activeChannels(Player player) {
         var playerId = player.getId();
-        return Stream.concat(channels.stream().filter(channel -> channel.getPlayerIDs().contains(playerId)),
-                        channels.stream().filter(channel -> channel.getSpyIDs().contains(playerId)))
+        return Stream.concat(channelProvider.getChannels()
+                                .stream()
+                                .filter(channel -> channel.getPlayerIDs().contains(playerId)),
+                        channelProvider.getChannels().stream().filter(channel -> channel.getSpyIDs().contains(playerId)))
                 .filter(channel -> hasAccess(playerId, channel));
     }
 
@@ -147,26 +155,30 @@ public class ChatModCore {
         requireAnyPermission(player, "chatmod.status");
 
         var playerId = player.getId();
-        return text("Current channels:\n", BLUE).append(activeChannels(player).sorted(Comparator.comparingInt(channel ->
-                channel.getSpyIDs().contains(playerId)
-                ? 1
-                : 0)).map(channel -> channel.toComponent(playerId)).collect(Util.Kyori.collector(text("\n"))));
+        return text("Current channelProvider.getChannels():\n",
+                BLUE).append(activeChannels(player).sorted(Comparator.comparingInt(channel -> channel.getSpyIDs()
+                                                                                                      .contains(playerId)
+                                                                                              ? 1
+                                                                                              : 0))
+                .map(channel -> channel.toComponent(playerId))
+                .collect(Util.Kyori.collector(text("\n"))));
     }
 
     public ComponentLike list(@NotNull Player player) {
         requireAnyPermission(player, "chatmod.channel.list");
 
         var playerId = player.getId();
-        return text("Available channels:\n", BLUE).append(availableChannels(player).map(channel -> channelInfoComponent(
-                channel,
-                playerId)).collect(Util.Kyori.collector(text("\n"))));
+        return text("Available channelProvider.getChannels():\n",
+                BLUE).append(availableChannels(player).map(channel -> channelInfoComponent(channel, playerId))
+                .collect(Util.Kyori.collector(text("\n"))));
     }
 
     public Component info(@NotNull Player player, String channelName) {
         requireAnyPermission(player, "chatmod.channel.info");
 
         var playerId = player.getId();
-        var channel = channels.stream()
+        var channel = channelProvider.getChannels()
+                .stream()
                 .filter(it -> channelName.equals(it.getName()))
                 .findAny()
                 .orElseThrow(() -> CommandException.noSuchChannel(channelName));
@@ -177,13 +189,15 @@ public class ChatModCore {
         requireAnyPermission(player, "chatmod.channel.join");
 
         var playerId = player.getId();
-        var channel = channels.stream()
+        var channel = channelProvider.getChannels()
+                .stream()
                 .filter(it -> channelName.equals(it.getName()))
                 .findAny()
                 .orElseThrow(() -> CommandException.noSuchChannel(channelName));
         if (channel.getPlayerIDs().contains(playerId)) throw new CommandException("You already joined this channel");
         var previous = activeChannels(player).filter(it -> it.getPlayerIDs().remove(playerId)).count();
-        log.fine("Removed player %s from %d previously joined channels".formatted(player, previous));
+        log.fine("Removed player %s from %d previously joined channelProvider.getChannels()".formatted(player,
+                previous));
         channel.getPlayerIDs().add(playerId);
         return text("Joined channel ", BLUE).append(channel.toComponent());
     }
@@ -201,7 +215,8 @@ public class ChatModCore {
         requireAnyPermission(player, "chatmod.channel.spy");
 
         var playerId = player.getId();
-        var channel = channels.stream()
+        var channel = channelProvider.getChannels()
+                .stream()
                 .filter(it -> channelName.equals(it.getName()))
                 .findAny()
                 .orElseThrow(() -> CommandException.noSuchChannel(channelName));
@@ -219,7 +234,8 @@ public class ChatModCore {
 
     public Component shout(@NotNull Player player, String channelName, String msg) {
         var playerId = player.getId();
-        var channel = channels.stream()
+        var channel = channelProvider.getChannels()
+                .stream()
                 .filter(it -> channelName.equals(it.getName()))
                 .findAny()
                 .orElseThrow(() -> CommandException.noSuchChannel(channelName));

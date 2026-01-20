@@ -9,6 +9,7 @@ import com.ampznetwork.chatmod.api.model.protocol.internal.PacketType;
 import com.ampznetwork.chatmod.api.util.ChatMessageParser;
 import com.ampznetwork.chatmod.lite.ChatModCore;
 import com.ampznetwork.chatmod.lite.model.JacksonPacketConverter;
+import com.ampznetwork.chatmod.lite.model.abstr.ChannelConfigProvider;
 import com.ampznetwork.chatmod.lite.model.abstr.ChatDispatcher;
 import com.ampznetwork.chatmod.lite.model.abstr.ChatModConfig;
 import com.ampznetwork.chatmod.lite.model.abstr.PacketCaster;
@@ -46,6 +47,7 @@ import org.comroid.commands.model.permission.PermissionAdapter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -64,16 +66,17 @@ import static net.kyori.adventure.text.format.NamedTextColor.*;
 @Getter
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 public class ChatModLiteSpigot extends JavaPlugin
-        implements ChatModConfig, ChatDispatcher, PlayerAdapter, PacketCaster, Listener {
-    ChatModCore core;
-    Map<UUID, com.ampznetwork.libmod.api.entity.Player> players = new ConcurrentHashMap<>();
+        implements ChatModConfig, ChatDispatcher, ChannelConfigProvider, PlayerAdapter, PacketCaster, Listener {
+    ChatModCore                                         core;
+    List<Channel>                                       channels = new ArrayList<>();
+    Map<UUID, com.ampznetwork.libmod.api.entity.Player> players  = new ConcurrentHashMap<>();
     @NonFinal String  serverName;
     @NonFinal Rabbit  rabbit;
     @NonFinal String formattingScheme;
     @NonFinal boolean compatibilityMode;
 
     public ChatModLiteSpigot() {
-        this.core = new ChatModCore(this, this, this, PermissionAdapter.spigot(), this);
+        this.core = new ChatModCore(this, this, this, PermissionAdapter.spigot(), this, this);
     }
 
     @Override
@@ -234,7 +237,7 @@ public class ChatModLiteSpigot extends JavaPlugin
             var map         = (Map<String, Map<String, Object>>) channelInfo;
             var channelName = map.keySet().stream().findAny().orElseThrow();
             var channelData = map.get(channelName);
-            core.getChannels()
+            channels
                     .add(new Channel(true,
                             channelName,
                             (String) channelData.getOrDefault("alias", null),

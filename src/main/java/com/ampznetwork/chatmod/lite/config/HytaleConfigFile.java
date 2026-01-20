@@ -1,6 +1,8 @@
 package com.ampznetwork.chatmod.lite.config;
 
+import com.ampznetwork.chatmod.api.model.config.channel.Channel;
 import com.ampznetwork.chatmod.lite.model.Config;
+import com.ampznetwork.chatmod.lite.model.abstr.ChannelConfigProvider;
 import com.ampznetwork.chatmod.lite.model.abstr.ChatModConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hypixel.hytale.server.core.util.io.BlockingDiskFile;
@@ -14,10 +16,11 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.file.Path;
+import java.util.List;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
-public class HytaleConfigFile extends BlockingDiskFile implements ChatModConfig {
+public class HytaleConfigFile extends BlockingDiskFile implements ChatModConfig, ChannelConfigProvider {
     ObjectMapper objectMapper;
     @NonFinal Config obj;
     @NonFinal Rabbit rabbit;
@@ -41,6 +44,11 @@ public class HytaleConfigFile extends BlockingDiskFile implements ChatModConfig 
     @Override
     public String getFormattingScheme() {
         return obj.formatting().scheme();
+    }
+
+    @Override
+    public List<Channel> getChannels() {
+        return obj.channels();
     }
 
     @Override
