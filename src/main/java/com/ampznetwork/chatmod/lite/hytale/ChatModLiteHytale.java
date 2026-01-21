@@ -97,18 +97,27 @@ public class ChatModLiteHytale extends JavaPlugin implements ChatDispatcher, Pla
         }
         var channel = channelOpt.get();
 
-        var       message   = packet.getMessage();
-        var       sender    = message.getSender();
+        var message = packet.getMessage();
         Component fullText = message.getFullText();
 
-        var player    = getPlayer(message.getSender().getId());
-        var fullPlain = LegacyComponentSerializer.legacyAmpersand().serialize(fullText);
+        var player = getPlayer(message.getSender().getId());
 
-        var formatted = PlaceholderAdapter.Native.applyPlaceholders(
-                config.getServerName(), channel.getAlternateName(), player, fullPlain);
-        var formattedSeri = LegacyComponentSerializer.legacyAmpersand().deserialize(formatted);
+        var split = config.getFormattingScheme().split("%message%");
 
-        core.localcast(channel, formattedSeri);
+        var prefix = PlaceholderAdapter.Native.applyPlaceholders(config.getServerName(),
+                channel.getAlternateName(),
+                player,
+                split[0]);
+        var suffix = split.length < 2 ? "" : PlaceholderAdapter.Native.applyPlaceholders(config.getServerName(),
+                channel.getAlternateName(),
+                player,
+                split[1]);
+
+        var prefixComponent = LegacyComponentSerializer.legacyAmpersand().deserialize(prefix);
+        var suffixComponent = LegacyComponentSerializer.legacyAmpersand().deserialize(suffix);
+
+        core.localcast(channel,
+                Component.text().append(prefixComponent).append(fullText).append(suffixComponent).build());
     }
 
     @Override
