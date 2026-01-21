@@ -11,19 +11,19 @@
     {
       "name": "global",
       "alias": "g",
-      "display": "&6global",
+      "display": "&6g",
       "publish": true
     },
     {
       "name": "local",
       "alias": "l",
-      "display": "&2local",
+      "display": "&2l",
       "publish": false
     },
     {
       "name": "staff",
       "alias": "s",
-      "display": "&4staff",
+      "display": "&4s",
       "publish": true,
       "permission": "chat.channel.staff"
     }

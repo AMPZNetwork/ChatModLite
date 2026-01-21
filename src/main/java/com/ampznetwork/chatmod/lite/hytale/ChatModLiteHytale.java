@@ -14,6 +14,7 @@ import com.ampznetwork.chatmod.lite.model.abstr.PacketCaster;
 import com.ampznetwork.chatmod.lite.model.abstr.PlayerAdapter;
 import com.ampznetwork.chatmod.lite.spigot.PlaceholderAdapter;
 import com.ampznetwork.libmod.api.entity.Player;
+import com.ampznetwork.libmod.api.util.Util;
 import com.hypixel.hytale.server.core.event.events.player.PlayerChatEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
@@ -104,14 +105,17 @@ public class ChatModLiteHytale extends JavaPlugin implements ChatDispatcher, Pla
 
         var split = config.getFormattingScheme().split("%message%");
 
-        var prefix = PlaceholderAdapter.Native.applyPlaceholders(config.getServerName(),
-                channel.getAlternateName(),
+        var prefix = PlaceholderAdapter.Native.applyPlaceholders(packet.getSource(),
+                channel.getDisplay(),
                 player,
                 split[0]);
-        var suffix = split.length < 2 ? "" : PlaceholderAdapter.Native.applyPlaceholders(config.getServerName(),
-                channel.getAlternateName(),
+        var suffix = split.length < 2 ? "" : PlaceholderAdapter.Native.applyPlaceholders(packet.getSource(),
+                channel.getDisplay(),
                 player,
                 split[1]);
+
+        prefix = Util.Kyori.sanitize(prefix, LegacyComponentSerializer.legacyAmpersand());
+        suffix = Util.Kyori.sanitize(suffix, LegacyComponentSerializer.legacyAmpersand());
 
         var prefixComponent = LegacyComponentSerializer.legacyAmpersand().deserialize(prefix);
         var suffixComponent = LegacyComponentSerializer.legacyAmpersand().deserialize(suffix);
