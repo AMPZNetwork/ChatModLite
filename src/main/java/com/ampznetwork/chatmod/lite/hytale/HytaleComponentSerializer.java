@@ -2,11 +2,13 @@ package com.ampznetwork.chatmod.lite.hytale;
 
 import com.hypixel.hytale.protocol.FormattedMessage;
 import com.hypixel.hytale.protocol.MaybeBool;
+import com.hypixel.hytale.server.core.Message;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import lombok.Value;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
+import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -22,12 +24,13 @@ import java.util.Objects;
 /// todo: message params, params, link, markup, messageId?
 @Value
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
-public class HytaleComponentSerializer implements ComponentSerializer<TextComponent, TextComponent, FormattedMessage> {
+public class HytaleComponentSerializer implements ComponentSerializer<TextComponent, TextComponent, Message> {
     @Instance public static final HytaleComponentSerializer INSTANCE = new HytaleComponentSerializer();
 
     @Override
-    public @NotNull TextComponent deserialize(@NotNull FormattedMessage input) {
-        var text = convertSingleComponent(input);
+    public @NotNull TextComponent deserialize(@NotNull Message msg) {
+        var input = msg.getFormattedMessage();
+        var text  = convertSingleComponent(input);
 
         if (input.children != null) for (var child : input.children) {
             var converted = convertSingleComponent(child);
@@ -38,14 +41,15 @@ public class HytaleComponentSerializer implements ComponentSerializer<TextCompon
     }
 
     @Override
-    public @NotNull FormattedMessage serialize(@NotNull TextComponent component) {
+    public @NotNull Message serialize(@NotNull TextComponent component) {
         var msg = convertSingleComponent(component);
 
-        msg.children = component.children()
+        msg.insertAll(component.children()
                 .stream()
+                .flatMap(Streams.expand(c -> c.children().stream()))
                 .flatMap(Streams.cast(TextComponent.class))
                 .map(this::convertSingleComponent)
-                .toArray(FormattedMessage[]::new);
+                .toList());
 
         return msg;
     }
@@ -66,35 +70,21 @@ public class HytaleComponentSerializer implements ComponentSerializer<TextCompon
         return text;
     }
 
-    private FormattedMessage convertSingleComponent(@NotNull TextComponent component) {
-        var content = component.content();
+    private Message convertSingleComponent(@NotNull TextComponent component) {
+        var text = Message.raw(component.content());
 
         var color = component.color();
+        if (color != null)
+            text.color(color.asHexString());
 
-        var bold = component.decoration(TextDecoration.BOLD) == TextDecoration.State.TRUE
-                   ? MaybeBool.True
-                   : MaybeBool.False;
-        var italic = component.decoration(TextDecoration.ITALIC) == TextDecoration.State.TRUE
-                     ? MaybeBool.True
-                     : MaybeBool.False;
-        var underlined = component.decoration(TextDecoration.UNDERLINED) == TextDecoration.State.TRUE
-                         ? MaybeBool.True
-                         : MaybeBool.False;
+        text.bold(component.decoration(TextDecoration.BOLD) == TextDecoration.State.TRUE);
+        text.italic(component.decoration(TextDecoration.ITALIC) == TextDecoration.State.TRUE);
 
-        // todo: monospaced font
+        var clickEvent = component.clickEvent();
+        if (clickEvent != null && clickEvent.action() == ClickEvent.Action.OPEN_URL)
+            text.link(clickEvent.payload().toString());
 
-        return new FormattedMessage(content,
-                null,
-                null,
-                null,
-                null,
-                color == null ? null : color.asHexString(),
-                bold,
-                italic,
-                MaybeBool.Null,
-                underlined,
-                null,
-                false);
+        return text;
     }
 
     private @Nullable TextColor parseHytaleColor(String $color) {

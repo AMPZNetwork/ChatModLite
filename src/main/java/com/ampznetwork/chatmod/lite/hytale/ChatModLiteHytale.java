@@ -13,7 +13,6 @@ import com.ampznetwork.chatmod.lite.model.abstr.ChatDispatcher;
 import com.ampznetwork.chatmod.lite.model.abstr.PacketCaster;
 import com.ampznetwork.chatmod.lite.model.abstr.PlayerAdapter;
 import com.ampznetwork.libmod.api.entity.Player;
-import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.event.events.player.PlayerChatEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
@@ -80,9 +79,7 @@ public class ChatModLiteHytale extends JavaPlugin implements ChatDispatcher, Pla
 
     @Override
     public void sendToPlayer(ComponentLike component, @NotNull Player player) {
-
-        var content = HytaleComponentSerializer.INSTANCE.serialize(((TextComponent) component.asComponent()));
-        var message = new Message(content);
+        var message = HytaleComponentSerializer.INSTANCE.serialize(((TextComponent) component.asComponent()));
 
         getPlayerRef(player.getId()).ifPresent(ref -> ref.sendMessage(message));
     }
