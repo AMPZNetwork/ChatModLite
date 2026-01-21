@@ -12,6 +12,7 @@ import com.ampznetwork.chatmod.lite.hytale.command.ShoutCommand;
 import com.ampznetwork.chatmod.lite.model.abstr.ChatDispatcher;
 import com.ampznetwork.chatmod.lite.model.abstr.PacketCaster;
 import com.ampznetwork.chatmod.lite.model.abstr.PlayerAdapter;
+import com.ampznetwork.chatmod.lite.spigot.PlaceholderAdapter;
 import com.ampznetwork.libmod.api.entity.Player;
 import com.hypixel.hytale.server.core.event.events.player.PlayerChatEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
@@ -26,6 +27,7 @@ import lombok.extern.java.Log;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.ComponentLike;
 import net.kyori.adventure.text.TextComponent;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Optional;
@@ -97,15 +99,16 @@ public class ChatModLiteHytale extends JavaPlugin implements ChatDispatcher, Pla
 
         var       message   = packet.getMessage();
         var       sender    = message.getSender();
-        Component formatted = message.getFullText();
+        Component fullText = message.getFullText();
 
-        /*
-        if (sender != null && sender instanceof OfflinePlayer player) {
-            formatted = formatMessage(packet.getSource(), channel.getAlternateName(), player, formatted);
-        }
-         */
+        var player    = getPlayer(message.getSender().getId());
+        var fullPlain = LegacyComponentSerializer.legacyAmpersand().serialize(fullText);
 
-        core.localcast(channel, formatted);
+        var formatted = PlaceholderAdapter.Native.applyPlaceholders(
+                config.getServerName(), channel.getAlternateName(), player, fullPlain);
+        var formattedSeri = LegacyComponentSerializer.legacyAmpersand().deserialize(formatted);
+
+        core.localcast(channel, formattedSeri);
     }
 
     @Override

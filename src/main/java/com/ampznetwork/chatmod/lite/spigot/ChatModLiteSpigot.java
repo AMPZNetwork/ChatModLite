@@ -397,13 +397,14 @@ public class ChatModLiteSpigot extends JavaPlugin
     }
 
     private Component formatMessage(String source, String channelName, OfflinePlayer player, Component content) {
+        var basic = basicPlayer(player);
         var raw   = LegacyComponentSerializer.legacyAmpersand().serialize(content);
         var fixes = formattingScheme.split("%message%");
         var adapter = SoftDepend.type("me.clip.placeholderapi.PlaceholderAPI")
                 .map($ -> PlaceholderAdapter.Hook)
                 .orElse(PlaceholderAdapter.Native);
-        var prefix = adapter.applyPlaceholders(source, channelName, player, fixes[0]);
-        var suffix = fixes.length > 1 ? adapter.applyPlaceholders(serverName, channelName, player, fixes[1]) : "";
+        var prefix = adapter.applyPlaceholders(source, channelName, basic, fixes[0]);
+        var suffix = fixes.length > 1 ? adapter.applyPlaceholders(serverName, channelName, basic, fixes[1]) : "";
         return LegacyComponentSerializer.legacyAmpersand().deserialize(prefix + raw + suffix);
     }
 
@@ -429,7 +430,7 @@ public class ChatModLiteSpigot extends JavaPlugin
         core.localcast(channel, formatted);
     }
 
-    private com.ampznetwork.libmod.api.entity.Player basicPlayer(Player player) {
+    private com.ampznetwork.libmod.api.entity.Player basicPlayer(OfflinePlayer player) {
         return com.ampznetwork.libmod.api.entity.Player.basic(player.getUniqueId(), player.getName());
     }
 }
