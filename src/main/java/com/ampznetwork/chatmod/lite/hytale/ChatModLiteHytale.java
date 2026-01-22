@@ -108,10 +108,22 @@ public class ChatModLiteHytale extends JavaPlugin implements ChatDispatcher, Pla
 
     private PlayerChatEvent handleChat(PlayerChatEvent event) {
         var player = getPlayer(event.getSender().getUuid());
-        var channel = core.activeChannels(player).findAny().orElseGet(() -> core.getChannels().getFirst());
+
+        var    plaintext             = event.getContent();
+        String quickShoutChannelName = null;
+        if (plaintext.startsWith("@#")) {
+            var endOfName = plaintext.indexOf(' ');
+            quickShoutChannelName = plaintext.substring(2, endOfName);
+            plaintext             = plaintext.substring(endOfName + 1);
+        }
+
+        var channel = Optional.ofNullable(quickShoutChannelName)
+                .flatMap(core::channel)
+                .or(() -> core.activeChannels(player).findAny())
+                .orElseGet(() -> core.getChannels().getFirst());
 
         var senderName = event.getSender().getUsername();
-        var bundle  = ChatMessageParser.parse(event.getContent(), config, channel, player, senderName);
+        var bundle  = ChatMessageParser.parse(plaintext, config, channel, player, senderName);
         var message = new ChatMessage(player, senderName, bundle);
         var packet  = new ChatMessagePacketImpl(PacketType.CHAT, config.getServerName(), channel.getName(), message);
 
