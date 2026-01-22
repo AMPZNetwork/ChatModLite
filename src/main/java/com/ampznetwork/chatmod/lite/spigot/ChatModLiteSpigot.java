@@ -348,13 +348,8 @@ public class ChatModLiteSpigot extends JavaPlugin
             var player     = getOrCreatePlayer(bukkitPlayer);
             var playerName = Util.Kyori.sanitizePlain(bukkitPlayer.getDisplayName());
 
-            var bundle = ChatMessageParser.parse(plaintext, this, channel, player, playerName);
-            var message = new ChatMessage(player,
-                    playerName,
-                    plaintext,
-                    bundle.prefix(),
-                    bundle.text(),
-                    bundle.suffix());
+            var bundle  = ChatMessageParser.parse(plaintext, this, channel, player, playerName);
+            var message = new ChatMessage(player, playerName, bundle);
 
             if (core.hasAccess(player.getId(), channel)) {
                 var packet = new ChatMessagePacketImpl(PacketType.CHAT,

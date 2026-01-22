@@ -23,7 +23,6 @@ import com.hypixel.hytale.server.core.universe.Universe;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.extern.java.Log;
-import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.ComponentLike;
 import net.kyori.adventure.text.TextComponent;
 import org.jetbrains.annotations.NotNull;
@@ -95,11 +94,8 @@ public class ChatModLiteHytale extends JavaPlugin implements ChatDispatcher, Pla
         }
         var channel = channelOpt.get();
 
-        var message = packet.getMessage();
-        Component fullText = message.getFullText();
-
-        if (config.getServerName().equals(packet.getSource())) {
-        }
+        var message  = packet.getMessage();
+        var fullText = message.getFullText();
 
         core.localcast(channel, fullText);
     }
@@ -115,14 +111,9 @@ public class ChatModLiteHytale extends JavaPlugin implements ChatDispatcher, Pla
         var channel = core.activeChannels(player).findAny().orElseGet(() -> core.getChannels().getFirst());
 
         var senderName = event.getSender().getUsername();
-        var bundle = ChatMessageParser.parse(event.getContent(), config, channel, player, senderName);
-        var message = new ChatMessage(player,
-                senderName,
-                event.getContent(),
-                bundle.prefix(),
-                bundle.text(),
-                bundle.suffix());
-        var packet = new ChatMessagePacketImpl(PacketType.CHAT, config.getServerName(), channel.getName(), message);
+        var bundle  = ChatMessageParser.parse(event.getContent(), config, channel, player, senderName);
+        var message = new ChatMessage(player, senderName, bundle);
+        var packet  = new ChatMessagePacketImpl(PacketType.CHAT, config.getServerName(), channel.getName(), message);
 
         core.outbound(channel, packet);
         event.setCancelled(true);
