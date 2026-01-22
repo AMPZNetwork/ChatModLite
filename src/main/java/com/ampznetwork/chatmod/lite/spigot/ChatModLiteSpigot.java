@@ -6,7 +6,7 @@ import com.ampznetwork.chatmod.api.model.protocol.ChatMessage;
 import com.ampznetwork.chatmod.api.model.protocol.ChatMessagePacket;
 import com.ampznetwork.chatmod.api.model.protocol.internal.ChatMessagePacketImpl;
 import com.ampznetwork.chatmod.api.model.protocol.internal.PacketType;
-import com.ampznetwork.chatmod.api.util.ChatMessageParser;
+import com.ampznetwork.chatmod.api.parse.ChatMessageParser;
 import com.ampznetwork.chatmod.lite.ChatModCore;
 import com.ampznetwork.chatmod.lite.model.abstr.ChannelConfigProvider;
 import com.ampznetwork.chatmod.lite.model.abstr.ChatDispatcher;
@@ -24,7 +24,6 @@ import lombok.experimental.NonFinal;
 import lombok.extern.slf4j.Slf4j;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.ComponentLike;
-import net.kyori.adventure.text.TextComponent;
 import net.kyori.adventure.text.serializer.bungeecord.BungeeComponentSerializer;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.OfflinePlayer;
@@ -338,8 +337,6 @@ public class ChatModLiteSpigot extends JavaPlugin
                 quickShoutChannelName = plaintext.substring(2, endOfName);
                 plaintext             = plaintext.substring(endOfName + 1);
             }
-
-            var msg = new ChatMessageParser().parse(plaintext);
             var bukkitPlayer = event.getPlayer();
             var channel = (quickShoutChannelName != null
                            ? core.channel(quickShoutChannelName)
@@ -347,11 +344,17 @@ public class ChatModLiteSpigot extends JavaPlugin
                                    .stream()
                                    .filter(chl -> chl.getPlayerIDs().contains(bukkitPlayer.getUniqueId()))
                                    .findAny()).orElseGet(core.getChannels()::getFirst);
-            msg = (TextComponent) formatMessage(serverName, channel.getDisplay(), bukkitPlayer, msg);
 
             var player     = getOrCreatePlayer(bukkitPlayer);
             var playerName = Util.Kyori.sanitizePlain(bukkitPlayer.getDisplayName());
-            var message    = new ChatMessage(player, playerName, plaintext, msg);
+
+            var bundle = ChatMessageParser.parse(plaintext, this, channel, player, playerName);
+            var message = new ChatMessage(player,
+                    playerName,
+                    plaintext,
+                    bundle.prefix(),
+                    bundle.text(),
+                    bundle.suffix());
 
             if (core.hasAccess(player.getId(), channel)) {
                 var packet = new ChatMessagePacketImpl(PacketType.CHAT,
@@ -402,8 +405,8 @@ public class ChatModLiteSpigot extends JavaPlugin
         var raw   = LegacyComponentSerializer.legacyAmpersand().serialize(content);
         var fixes = formattingScheme.split("%message%");
         var adapter = SoftDepend.type("me.clip.placeholderapi.PlaceholderAPI")
-                .map($ -> PlaceholderAdapter.Hook)
-                .orElse(PlaceholderAdapter.Native);
+                .map($ -> com.ampznetwork.chatmod.lite.model.abstr.PlaceholderAdapter.Hook)
+                .orElse(com.ampznetwork.chatmod.lite.model.abstr.PlaceholderAdapter.Native);
         var prefix = adapter.applyPlaceholders(source, channelName, basic.getName(), basic, fixes[0]);
         var suffix = fixes.length > 1 ? adapter.applyPlaceholders(serverName,
                 channelName,

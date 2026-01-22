@@ -4,7 +4,7 @@ import com.ampznetwork.chatmod.api.model.protocol.ChatMessage;
 import com.ampznetwork.chatmod.api.model.protocol.ChatMessagePacket;
 import com.ampznetwork.chatmod.api.model.protocol.internal.ChatMessagePacketImpl;
 import com.ampznetwork.chatmod.api.model.protocol.internal.PacketType;
-import com.ampznetwork.chatmod.api.util.ChatMessageParser;
+import com.ampznetwork.chatmod.api.parse.ChatMessageParser;
 import com.ampznetwork.chatmod.lite.ChatModCore;
 import com.ampznetwork.chatmod.lite.config.HytaleConfigFile;
 import com.ampznetwork.chatmod.lite.hytale.command.ChannelCommand;
@@ -12,9 +12,7 @@ import com.ampznetwork.chatmod.lite.hytale.command.ShoutCommand;
 import com.ampznetwork.chatmod.lite.model.abstr.ChatDispatcher;
 import com.ampznetwork.chatmod.lite.model.abstr.PacketCaster;
 import com.ampznetwork.chatmod.lite.model.abstr.PlayerAdapter;
-import com.ampznetwork.chatmod.lite.spigot.PlaceholderAdapter;
 import com.ampznetwork.libmod.api.entity.Player;
-import com.ampznetwork.libmod.api.util.Util;
 import com.hypixel.hytale.server.core.event.events.player.PlayerChatEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
@@ -28,7 +26,6 @@ import lombok.extern.java.Log;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.ComponentLike;
 import net.kyori.adventure.text.TextComponent;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Optional;
@@ -117,33 +114,15 @@ public class ChatModLiteHytale extends JavaPlugin implements ChatDispatcher, Pla
         var player = getPlayer(event.getSender().getUuid());
         var channel = core.activeChannels(player).findAny().orElseGet(() -> core.getChannels().getFirst());
 
-        var text       = new ChatMessageParser().parse(event.getContent());
-        var split      = config.getFormattingScheme().split("%message%");
-        var serverName = config.getServerName();
         var senderName = event.getSender().getUsername();
-        var prefix = PlaceholderAdapter.Native.applyPlaceholders(serverName,
-                channel.getDisplay(),
+        var bundle = ChatMessageParser.parse(event.getContent(), config, channel, player, senderName);
+        var message = new ChatMessage(player,
                 senderName,
-                player,
-                split[0]);
-        var suffix = split.length < 2
-                     ? ""
-                     : PlaceholderAdapter.Native.applyPlaceholders(serverName,
-                             channel.getDisplay(),
-                             senderName,
-                             player,
-                             split[1]);
-
-        prefix = Util.Kyori.sanitize(prefix, LegacyComponentSerializer.legacyAmpersand());
-        suffix = Util.Kyori.sanitize(suffix, LegacyComponentSerializer.legacyAmpersand());
-
-        var prefixComponent = LegacyComponentSerializer.legacyAmpersand().deserialize(prefix);
-        var suffixComponent = LegacyComponentSerializer.legacyAmpersand().deserialize(suffix);
-
-        text = Component.text().append(prefixComponent).append(text).append(suffixComponent).build();
-
-        var message = new ChatMessage(player, senderName, event.getContent(), text);
-        var packet  = new ChatMessagePacketImpl(PacketType.CHAT, serverName, channel.getName(), message);
+                event.getContent(),
+                bundle.prefix(),
+                bundle.text(),
+                bundle.suffix());
+        var packet = new ChatMessagePacketImpl(PacketType.CHAT, config.getServerName(), channel.getName(), message);
 
         core.outbound(channel, packet);
         event.setCancelled(true);

@@ -5,7 +5,7 @@ import com.ampznetwork.chatmod.api.model.protocol.ChatMessage;
 import com.ampznetwork.chatmod.api.model.protocol.ChatMessagePacket;
 import com.ampznetwork.chatmod.api.model.protocol.internal.ChatMessagePacketImpl;
 import com.ampznetwork.chatmod.api.model.protocol.internal.PacketType;
-import com.ampznetwork.chatmod.api.util.ChatMessageParser;
+import com.ampznetwork.chatmod.api.parse.ChatMessageParser;
 import com.ampznetwork.chatmod.lite.lang.Words;
 import com.ampznetwork.chatmod.lite.model.JacksonPacketConverter;
 import com.ampznetwork.chatmod.lite.model.abstr.ChannelConfigProvider;
