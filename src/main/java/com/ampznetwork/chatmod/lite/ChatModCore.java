@@ -46,6 +46,12 @@ import static net.kyori.adventure.text.format.NamedTextColor.*;
 @Log
 @Value
 public class ChatModCore implements ChannelConfigProvider {
+    private static ChatModCore instance;
+
+    public static ChatModCore get() {
+        return instance;
+    }
+
     ChatModConfig                                          config;
     ChatDispatcher                                         dispatcher;
     PlayerAdapter                                          playerAdapter;
@@ -54,6 +60,10 @@ public class ChatModCore implements ChannelConfigProvider {
     ChannelConfigProvider channelProvider;
     ObjectMapper                                           objectMapper = new ObjectMapper();
     Map<Channel, Rabbit.Exchange.Route<ChatMessagePacket>> mqChannels   = new ConcurrentHashMap<>();
+
+    {
+        instance = this;
+    }
 
     @Override
     public List<Channel> getChannels() {

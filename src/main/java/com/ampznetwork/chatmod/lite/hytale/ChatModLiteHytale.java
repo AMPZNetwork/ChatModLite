@@ -34,8 +34,18 @@ import java.util.UUID;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class ChatModLiteHytale extends JavaPlugin implements ChatDispatcher, PlayerAdapter, PacketCaster {
+    private static ChatModLiteHytale instance;
+
+    public static ChatModLiteHytale get() {
+        return instance;
+    }
+
     HytaleConfigFile config;
     ChatModCore      core;
+
+    {
+        instance = this;
+    }
 
     public ChatModLiteHytale(@NotNull JavaPluginInit init) {
         super(init);
