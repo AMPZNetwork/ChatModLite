@@ -69,14 +69,13 @@ public class ChatModCore implements ChannelConfigProvider {
         first.getSpyIDs().add(id);
 
         // auto-spy channels
-        getChannels()
-                .stream()
-                .filter(channel -> getPermissionAdapter()
-                        .checkPermissionOrOp(id, "chat.autospy." + channel.getName(), true))
+        getChannels().stream()
+                .filter(channel -> getPermissionAdapter().checkPermissionOrOp(id,
+                        "chat.autospy." + channel.getName(),
+                        true))
                 .peek(channel -> {
                     if (!hasAccess(id,
-                            channel)) log.warning(("Player %s has auto-join permission for channel %s but does not " +
-                                                   "have access to the " + "channel").formatted(
+                            channel)) log.warning(("Player %s has auto-join permission for channel %s but does not " + "have access to the " + "channel").formatted(
                             player.getName(),
                             channel.getName()));
                 })
@@ -272,16 +271,17 @@ public class ChatModCore implements ChannelConfigProvider {
                 .filter(it -> channelName.equals(it.getName()))
                 .findAny()
                 .orElseThrow(() -> CommandException.noSuchChannel(channelName));
-        var content     = new ChatMessageParser().parse(msg);
-        var basicPlayer = com.ampznetwork.libmod.api.entity.Player.basic(playerId, player.getName());
-        var message     = new ChatMessage(basicPlayer, player.getBestName(), msg, content);
+        var playerName  = player.getName();
+        var basicPlayer = com.ampznetwork.libmod.api.entity.Player.basic(playerId, playerName);
+        var bundle      = ChatMessageParser.parse(msg, config, channel, basicPlayer, playerName);
+        var message     = new ChatMessage(basicPlayer, player.getBestName(), bundle);
         var packet = new ChatMessagePacketImpl(PacketType.CHAT,
                 config.getServerName(),
                 channel.getName(),
                 message,
                 List.of());
         outbound(channel, packet);
-        return text("Message shouted: ").append(content);
+        return text("Message shouted", GREEN);
     }
 
     public Component channelInfoComponent(Channel channel, UUID playerId) {
@@ -299,16 +299,18 @@ public class ChatModCore implements ChannelConfigProvider {
         var playerName = player.getName();
         return new ChatMessage(com.ampznetwork.libmod.api.entity.Player.basic(player.getId(), playerName),
                 playerName,
-                "> ▶️ Joined the game",
-                text("joined the game", YELLOW));
+                new ChatMessageParser.MessageBundle(text(player.getName() + " ", GREEN),
+                        text("> ▶️ Joined the game", YELLOW),
+                        null));
     }
 
     public ChatMessage createLeaveMessage(Player player) {
         var playerName = player.getName();
         return new ChatMessage(com.ampznetwork.libmod.api.entity.Player.basic(player.getId(), playerName),
                 playerName,
-                "> ⏹️ Left the game",
-                text("left the game", YELLOW));
+                new ChatMessageParser.MessageBundle(text(player.getName() + " ", GREEN),
+                        text("> ▶️ Left the game", YELLOW),
+                        null));
     }
 
     public ChatMessage createAdvancementMessage(Player player, Advancement advancement) {
@@ -318,16 +320,16 @@ public class ChatModCore implements ChannelConfigProvider {
         var displayText = "> \uD83C\uDFC6 Completed the advancement \"" + display.getTitle() + "\"\n> `" + display.getDescription() + "`";
         return new ChatMessage(com.ampznetwork.libmod.api.entity.Player.basic(player.getId(), playerName),
                 playerName,
-                displayText,
-                text(displayText, YELLOW));
+                new ChatMessageParser.MessageBundle(text(player.getName() + " ", GREEN), text(displayText), null));
     }
 
     public ChatMessage createDeathMessage(Player player, String deathMessage) {
         var playerName = player.getName();
         return new ChatMessage(com.ampznetwork.libmod.api.entity.Player.basic(player.getId(), playerName),
                 playerName,
-                "> ☠️ " + deathMessage,
-                text(deathMessage, YELLOW));
+                new ChatMessageParser.MessageBundle(text(player.getName() + " ", GREEN),
+                        text("> ☠️ " + deathMessage),
+                        null));
     }
 
     public boolean hasAccess(UUID id, Channel channel) {

@@ -1,0 +1,7 @@
+<component name="ProjectRunConfigurationManager">
+    <configuration default="false" name="Lite on Hytale + Arclight" type="CompoundRunConfigurationType">
+        <toRun name="ChatModLite on Arclight" type="JarApplication"/>
+        <toRun name="ChatModLite on Hytale" type="JarApplication"/>
+        <method v="2"/>
+    </configuration>
+</component>
