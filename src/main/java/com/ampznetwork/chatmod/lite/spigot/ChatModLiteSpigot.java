@@ -236,14 +236,13 @@ public class ChatModLiteSpigot extends JavaPlugin
             var map         = (Map<String, Map<String, Object>>) channelInfo;
             var channelName = map.keySet().stream().findAny().orElseThrow();
             var channelData = map.get(channelName);
-            channels
-                    .add(new Channel(true,
-                            channelName,
-                            (String) channelData.getOrDefault("alias", null),
-                            (String) channelData.getOrDefault("display", null),
-                            (String) channelData.getOrDefault("permission", null),
-                            null,
-                            (Boolean) channelData.getOrDefault("publish", Boolean.TRUE)));
+            channels.add(new Channel(true,
+                    channelName,
+                    (String) channelData.getOrDefault("alias", null),
+                    (String) channelData.getOrDefault("display", null),
+                    (String) channelData.getOrDefault("permission", null),
+                    null,
+                    (Boolean) channelData.getOrDefault("publish", Boolean.TRUE)));
         }
         getLogger().info("Loaded %d channels".formatted(core.getChannels().size()));
 
@@ -392,8 +391,7 @@ public class ChatModLiteSpigot extends JavaPlugin
     @Override
     public com.ampznetwork.libmod.api.entity.Player getPlayer(UUID playerId) {
         var bukkitPlayer = getServer().getPlayer(playerId);
-        return basicPlayer(Objects.requireNonNull(bukkitPlayer,
-                "bukkitPlayer"));
+        return basicPlayer(Objects.requireNonNull(bukkitPlayer, "bukkitPlayer"));
     }
 
     private Component formatMessage(String source, String channelName, OfflinePlayer player, Component content) {
@@ -403,8 +401,12 @@ public class ChatModLiteSpigot extends JavaPlugin
         var adapter = SoftDepend.type("me.clip.placeholderapi.PlaceholderAPI")
                 .map($ -> PlaceholderAdapter.Hook)
                 .orElse(PlaceholderAdapter.Native);
-        var prefix = adapter.applyPlaceholders(source, channelName, basic, fixes[0]);
-        var suffix = fixes.length > 1 ? adapter.applyPlaceholders(serverName, channelName, basic, fixes[1]) : "";
+        var prefix = adapter.applyPlaceholders(source, channelName, basic.getName(), basic, fixes[0]);
+        var suffix = fixes.length > 1 ? adapter.applyPlaceholders(serverName,
+                channelName,
+                basic.getName(),
+                basic,
+                fixes[1]) : "";
         return LegacyComponentSerializer.legacyAmpersand().deserialize(prefix + raw + suffix);
     }
 

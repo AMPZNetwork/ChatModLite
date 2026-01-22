@@ -101,27 +101,35 @@ public class ChatModLiteHytale extends JavaPlugin implements ChatDispatcher, Pla
         var message = packet.getMessage();
         Component fullText = message.getFullText();
 
-        var player = getPlayer(message.getSender().getId());
+        if (config.getServerName().equals(packet.getSource())) {
+            var sender = message.getSender();
+            var player = sender == null ? null : getPlayer(sender.getId());
 
-        var split = config.getFormattingScheme().split("%message%");
+            var split = config.getFormattingScheme().split("%message%");
 
-        var prefix = PlaceholderAdapter.Native.applyPlaceholders(packet.getSource(),
-                channel.getDisplay(),
-                player,
-                split[0]);
-        var suffix = split.length < 2 ? "" : PlaceholderAdapter.Native.applyPlaceholders(packet.getSource(),
-                channel.getDisplay(),
-                player,
-                split[1]);
+            var prefix = PlaceholderAdapter.Native.applyPlaceholders(packet.getSource(),
+                    channel.getDisplay(),
+                    packet.getMessage().getSenderName(),
+                    player,
+                    split[0]);
+            var suffix = split.length < 2
+                         ? ""
+                         : PlaceholderAdapter.Native.applyPlaceholders(packet.getSource(),
+                                 channel.getDisplay(),
+                                 packet.getMessage().getSenderName(),
+                                 player,
+                                 split[1]);
 
-        prefix = Util.Kyori.sanitize(prefix, LegacyComponentSerializer.legacyAmpersand());
-        suffix = Util.Kyori.sanitize(suffix, LegacyComponentSerializer.legacyAmpersand());
+            prefix = Util.Kyori.sanitize(prefix, LegacyComponentSerializer.legacyAmpersand());
+            suffix = Util.Kyori.sanitize(suffix, LegacyComponentSerializer.legacyAmpersand());
 
-        var prefixComponent = LegacyComponentSerializer.legacyAmpersand().deserialize(prefix);
-        var suffixComponent = LegacyComponentSerializer.legacyAmpersand().deserialize(suffix);
+            var prefixComponent = LegacyComponentSerializer.legacyAmpersand().deserialize(prefix);
+            var suffixComponent = LegacyComponentSerializer.legacyAmpersand().deserialize(suffix);
 
-        core.localcast(channel,
-                Component.text().append(prefixComponent).append(fullText).append(suffixComponent).build());
+            fullText = Component.text().append(prefixComponent).append(fullText).append(suffixComponent).build();
+        }
+
+        core.localcast(channel, fullText);
     }
 
     @Override
