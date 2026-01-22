@@ -102,31 +102,6 @@ public class ChatModLiteHytale extends JavaPlugin implements ChatDispatcher, Pla
         Component fullText = message.getFullText();
 
         if (config.getServerName().equals(packet.getSource())) {
-            var sender = message.getSender();
-            var player = sender == null ? null : getPlayer(sender.getId());
-
-            var split = config.getFormattingScheme().split("%message%");
-
-            var prefix = PlaceholderAdapter.Native.applyPlaceholders(packet.getSource(),
-                    channel.getDisplay(),
-                    packet.getMessage().getSenderName(),
-                    player,
-                    split[0]);
-            var suffix = split.length < 2
-                         ? ""
-                         : PlaceholderAdapter.Native.applyPlaceholders(packet.getSource(),
-                                 channel.getDisplay(),
-                                 packet.getMessage().getSenderName(),
-                                 player,
-                                 split[1]);
-
-            prefix = Util.Kyori.sanitize(prefix, LegacyComponentSerializer.legacyAmpersand());
-            suffix = Util.Kyori.sanitize(suffix, LegacyComponentSerializer.legacyAmpersand());
-
-            var prefixComponent = LegacyComponentSerializer.legacyAmpersand().deserialize(prefix);
-            var suffixComponent = LegacyComponentSerializer.legacyAmpersand().deserialize(suffix);
-
-            fullText = Component.text().append(prefixComponent).append(fullText).append(suffixComponent).build();
         }
 
         core.localcast(channel, fullText);
@@ -142,13 +117,37 @@ public class ChatModLiteHytale extends JavaPlugin implements ChatDispatcher, Pla
         var player = getPlayer(event.getSender().getUuid());
         var channel = core.activeChannels(player).findAny().orElseGet(() -> core.getChannels().getFirst());
 
-        var text    = new ChatMessageParser().parse(event.getContent());
-        var message = new ChatMessage(player, event.getSender().getUsername(), event.getContent(), text);
-        var packet  = new ChatMessagePacketImpl(PacketType.CHAT, config.getServerName(), channel.getName(), message);
+        var text       = new ChatMessageParser().parse(event.getContent());
+        var split      = config.getFormattingScheme().split("%message%");
+        var serverName = config.getServerName();
+        var senderName = event.getSender().getUsername();
+        var prefix = PlaceholderAdapter.Native.applyPlaceholders(serverName,
+                channel.getDisplay(),
+                senderName,
+                player,
+                split[0]);
+        var suffix = split.length < 2
+                     ? ""
+                     : PlaceholderAdapter.Native.applyPlaceholders(serverName,
+                             channel.getDisplay(),
+                             senderName,
+                             player,
+                             split[1]);
+
+        prefix = Util.Kyori.sanitize(prefix, LegacyComponentSerializer.legacyAmpersand());
+        suffix = Util.Kyori.sanitize(suffix, LegacyComponentSerializer.legacyAmpersand());
+
+        var prefixComponent = LegacyComponentSerializer.legacyAmpersand().deserialize(prefix);
+        var suffixComponent = LegacyComponentSerializer.legacyAmpersand().deserialize(suffix);
+
+        text = Component.text().append(prefixComponent).append(text).append(suffixComponent).build();
+
+        var message = new ChatMessage(player, senderName, event.getContent(), text);
+        var packet  = new ChatMessagePacketImpl(PacketType.CHAT, serverName, channel.getName(), message);
 
         core.outbound(channel, packet);
-
         event.setCancelled(true);
+
         return event;
     }
 

@@ -24,6 +24,7 @@ import lombok.experimental.NonFinal;
 import lombok.extern.slf4j.Slf4j;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.ComponentLike;
+import net.kyori.adventure.text.TextComponent;
 import net.kyori.adventure.text.serializer.bungeecord.BungeeComponentSerializer;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.OfflinePlayer;
@@ -338,17 +339,19 @@ public class ChatModLiteSpigot extends JavaPlugin
                 plaintext             = plaintext.substring(endOfName + 1);
             }
 
-            var msg        = new ChatMessageParser().parse(plaintext);
+            var msg = new ChatMessageParser().parse(plaintext);
             var bukkitPlayer = event.getPlayer();
-            var player       = getOrCreatePlayer(bukkitPlayer);
-            var playerName = Util.Kyori.sanitizePlain(bukkitPlayer.getDisplayName());
-            var message    = new ChatMessage(player, playerName, plaintext, msg);
             var channel = (quickShoutChannelName != null
                            ? core.channel(quickShoutChannelName)
                            : core.getChannels()
                                    .stream()
                                    .filter(chl -> chl.getPlayerIDs().contains(bukkitPlayer.getUniqueId()))
                                    .findAny()).orElseGet(core.getChannels()::getFirst);
+            msg = (TextComponent) formatMessage(serverName, channel.getDisplay(), bukkitPlayer, msg);
+
+            var player     = getOrCreatePlayer(bukkitPlayer);
+            var playerName = Util.Kyori.sanitizePlain(bukkitPlayer.getDisplayName());
+            var message    = new ChatMessage(player, playerName, plaintext, msg);
 
             if (core.hasAccess(player.getId(), channel)) {
                 var packet = new ChatMessagePacketImpl(PacketType.CHAT,
@@ -419,15 +422,10 @@ public class ChatModLiteSpigot extends JavaPlugin
             getLogger().warning("Received message for nonexistent channel: " + packet.getChannel());
             return;
         }
-        var channel = channelOpt.get();
 
-        var       message   = packet.getMessage();
-        var       sender    = message.getSender();
-        Component formatted = message.getFullText();
-
-        if (sender != null && sender instanceof OfflinePlayer player) {
-            formatted = formatMessage(packet.getSource(), channel.getAlternateName(), player, formatted);
-        }
+        var channel   = channelOpt.get();
+        var message   = packet.getMessage();
+        var formatted = message.getFullText();
 
         core.localcast(channel, formatted);
     }
