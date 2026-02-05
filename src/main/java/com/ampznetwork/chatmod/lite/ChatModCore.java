@@ -353,9 +353,22 @@ public class ChatModCore implements ChannelConfigProvider {
             if (!channel.isPublish()) continue;
             var route = exchange.route(Util.Kyori.sanitizePlain(config.getServerName() + ".chat." + channel.getName())
                     .toLowerCase(), "chat." + channel.getName(), new JacksonPacketConverter(getObjectMapper()));
-            route.subscribeData(packetCaster::localcastPacket);
+            route.subscribeData(this::directToLocalChannel);
             getMqChannels().put(channel, route);
         }
         log.info("Created %d RabbitMQ bindings".formatted(getMqChannels().size()));
+    }
+
+    private void directToLocalChannel(ChatMessagePacket packet) {
+        var channelName = packet.getChannel();
+
+        if (!channelName.startsWith("@")) {
+            packetCaster.localcastPacket(packet);
+            return;
+        }
+
+        var uuid      = UUID.fromString(channelName.substring(1));
+        var recipient = playerAdapter.getPlayer(uuid);
+        dispatcher.sendToPlayer(packet.getMessage().getFullText(), recipient);
     }
 }
