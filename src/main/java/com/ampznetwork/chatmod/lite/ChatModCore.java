@@ -3,8 +3,7 @@ package com.ampznetwork.chatmod.lite;
 import com.ampznetwork.chatmod.api.model.config.channel.Channel;
 import com.ampznetwork.chatmod.api.model.protocol.ChatMessage;
 import com.ampznetwork.chatmod.api.model.protocol.ChatMessagePacket;
-import com.ampznetwork.chatmod.api.model.protocol.internal.ChatMessagePacketImpl;
-import com.ampznetwork.chatmod.api.model.protocol.internal.PacketType;
+import com.ampznetwork.chatmod.api.model.protocol.PacketType;
 import com.ampznetwork.chatmod.api.parse.ChatMessageParser;
 import com.ampznetwork.chatmod.lite.lang.Words;
 import com.ampznetwork.chatmod.lite.model.JacksonPacketConverter;
@@ -93,7 +92,7 @@ public class ChatModCore implements ChannelConfigProvider {
 
         // send join message
         var message = createJoinMessage(player);
-        var packet = new ChatMessagePacketImpl(PacketType.JOIN,
+        var packet = new ChatMessagePacket(PacketType.JOIN,
                 config.getServerName(),
                 first.getName(),
                 message,
@@ -107,7 +106,7 @@ public class ChatModCore implements ChannelConfigProvider {
 
         // send leave message
         var message = createLeaveMessage(player);
-        var packet = new ChatMessagePacketImpl(PacketType.LEAVE,
+        var packet = new ChatMessagePacket(PacketType.LEAVE,
                 config.getServerName(),
                 channel.getName(),
                 message,
@@ -285,7 +284,7 @@ public class ChatModCore implements ChannelConfigProvider {
         var basicPlayer = com.ampznetwork.libmod.api.entity.Player.basic(playerId, playerName);
         var bundle      = ChatMessageParser.parse(msg, config, channel, basicPlayer, playerName);
         var message     = new ChatMessage(basicPlayer, player.getBestName(), bundle);
-        var packet = new ChatMessagePacketImpl(PacketType.CHAT,
+        var packet = new ChatMessagePacket(PacketType.CHAT,
                 config.getServerName(),
                 channel.getName(),
                 message,

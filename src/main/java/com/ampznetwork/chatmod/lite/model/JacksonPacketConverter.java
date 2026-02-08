@@ -1,7 +1,6 @@
 package com.ampznetwork.chatmod.lite.model;
 
 import com.ampznetwork.chatmod.api.model.protocol.ChatMessagePacket;
-import com.ampznetwork.chatmod.api.model.protocol.internal.ChatMessagePacketImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.SneakyThrows;
 import lombok.Value;
@@ -20,6 +19,6 @@ public class JacksonPacketConverter implements ByteConverter<ChatMessagePacket> 
     @Override
     @SneakyThrows
     public ChatMessagePacket fromBytes(byte[] bytes) {
-        return objectMapper.readValue(bytes, ChatMessagePacketImpl.class);
+        return objectMapper.readValue(bytes, ChatMessagePacket.class);
     }
 }

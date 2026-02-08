@@ -2,8 +2,7 @@ package com.ampznetwork.chatmod.lite.hytale;
 
 import com.ampznetwork.chatmod.api.model.protocol.ChatMessage;
 import com.ampznetwork.chatmod.api.model.protocol.ChatMessagePacket;
-import com.ampznetwork.chatmod.api.model.protocol.internal.ChatMessagePacketImpl;
-import com.ampznetwork.chatmod.api.model.protocol.internal.PacketType;
+import com.ampznetwork.chatmod.api.model.protocol.PacketType;
 import com.ampznetwork.chatmod.api.parse.ChatMessageParser;
 import com.ampznetwork.chatmod.lite.ChatModCore;
 import com.ampznetwork.chatmod.lite.config.HytaleConfigFile;
@@ -135,7 +134,7 @@ public class ChatModLiteHytale extends JavaPlugin implements ChatDispatcher, Pla
         var senderName = event.getSender().getUsername();
         var bundle  = ChatMessageParser.parse(plaintext, config, channel, player, senderName);
         var message = new ChatMessage(player, senderName, bundle);
-        var packet  = new ChatMessagePacketImpl(PacketType.CHAT, config.getServerName(), channel.getName(), message);
+        var packet = new ChatMessagePacket(PacketType.CHAT, config.getServerName(), channel.getName(), message);
 
         core.outbound(channel, packet);
         event.setCancelled(true);

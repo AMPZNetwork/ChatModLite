@@ -4,8 +4,7 @@ import com.ampznetwork.chatmod.api.model.config.ChatModules;
 import com.ampznetwork.chatmod.api.model.config.channel.Channel;
 import com.ampznetwork.chatmod.api.model.protocol.ChatMessage;
 import com.ampznetwork.chatmod.api.model.protocol.ChatMessagePacket;
-import com.ampznetwork.chatmod.api.model.protocol.internal.ChatMessagePacketImpl;
-import com.ampznetwork.chatmod.api.model.protocol.internal.PacketType;
+import com.ampznetwork.chatmod.api.model.protocol.PacketType;
 import com.ampznetwork.chatmod.api.parse.ChatMessageParser;
 import com.ampznetwork.chatmod.lite.ChatModCore;
 import com.ampznetwork.chatmod.lite.model.abstr.ChannelConfigProvider;
@@ -301,7 +300,7 @@ public class ChatModLiteSpigot extends JavaPlugin
 
         // send leave message
         var message = core.createAdvancementMessage(player, advancement);
-        var packet = new ChatMessagePacketImpl(PacketType.OTHER,
+        var packet = new ChatMessagePacket(PacketType.OTHER,
                 serverName,
                 first.getName(),
                 message,
@@ -316,7 +315,7 @@ public class ChatModLiteSpigot extends JavaPlugin
 
         // send leave message
         var message = core.createDeathMessage(player, event.getDeathMessage());
-        var packet = new ChatMessagePacketImpl(PacketType.OTHER,
+        var packet = new ChatMessagePacket(PacketType.OTHER,
                 serverName,
                 first.getName(),
                 message,
@@ -352,7 +351,7 @@ public class ChatModLiteSpigot extends JavaPlugin
             var message = new ChatMessage(player, playerName, bundle);
 
             if (core.hasAccess(player.getId(), channel)) {
-                var packet = new ChatMessagePacketImpl(PacketType.CHAT,
+                var packet = new ChatMessagePacket(PacketType.CHAT,
                         serverName,
                         channel.getName(),
                         message,
