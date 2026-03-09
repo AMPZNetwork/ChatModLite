@@ -159,7 +159,7 @@ public class ChatModCore implements ChannelConfigProvider {
         log.info(PlainTextComponentSerializer.plainText().serialize(component));
 
         channel.allPlayerIDs()
-                .map(playerAdapter::getPlayer)
+                .flatMap(playerId -> Stream.ofNullable(playerAdapter.getPlayer(playerId)))
                 .distinct()
                 .filter(Objects::nonNull)
                 .filter(player -> hasAccess(player.getId(), channel))

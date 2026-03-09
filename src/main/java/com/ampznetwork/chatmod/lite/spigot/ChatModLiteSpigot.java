@@ -377,7 +377,9 @@ public class ChatModLiteSpigot extends JavaPlugin
     }
 
     @Override
-    public com.ampznetwork.libmod.api.entity.Player getPlayer(UUID playerId) {
+    public @Nullable com.ampznetwork.libmod.api.entity.Player getPlayer(UUID playerId) {
+        if (playerId == null) return null;
+
         var bukkitPlayer = getServer().getPlayer(playerId);
         return basicPlayer(Objects.requireNonNull(bukkitPlayer,
                 "BukkitPlayer with ID %s could not be found".formatted(playerId)));

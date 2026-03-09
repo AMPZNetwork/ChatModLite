@@ -25,6 +25,7 @@ import lombok.extern.java.Log;
 import net.kyori.adventure.text.ComponentLike;
 import net.kyori.adventure.text.TextComponent;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -110,7 +111,9 @@ public class ChatModLiteHytale extends JavaPlugin implements ChatDispatcher, Pla
     }
 
     @Override
-    public Player getPlayer(UUID playerId) {
+    public @Nullable Player getPlayer(UUID playerId) {
+        if (playerId == null) return null;
+
         var ref = Universe.get().getPlayer(playerId);
         return Player.basic(playerId, ref != null ? ref.getUsername() : "Hytale User");
     }
