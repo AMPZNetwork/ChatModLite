@@ -300,11 +300,7 @@ public class ChatModLiteSpigot extends JavaPlugin
 
         // send leave message
         var message = core.createAdvancementMessage(player, advancement);
-        var packet = new ChatMessagePacket(PacketType.OTHER,
-                serverName,
-                first.getName(),
-                message,
-                List.of(serverName));
+        var packet = new ChatMessagePacket(PacketType.OTHER, serverName, first.getName(), message, List.of(serverName));
         core.outbound(first, packet);
     }
 
@@ -315,11 +311,7 @@ public class ChatModLiteSpigot extends JavaPlugin
 
         // send leave message
         var message = core.createDeathMessage(player, event.getDeathMessage());
-        var packet = new ChatMessagePacket(PacketType.OTHER,
-                serverName,
-                first.getName(),
-                message,
-                List.of(serverName));
+        var packet = new ChatMessagePacket(PacketType.OTHER, serverName, first.getName(), message, List.of(serverName));
         core.outbound(first, packet);
     }
 
@@ -351,11 +343,7 @@ public class ChatModLiteSpigot extends JavaPlugin
             var message = new ChatMessage(player, playerName, bundle);
 
             if (core.hasAccess(player.getId(), channel)) {
-                var packet = new ChatMessagePacket(PacketType.CHAT,
-                        serverName,
-                        channel.getName(),
-                        message,
-                        List.of());
+                var packet = new ChatMessagePacket(PacketType.CHAT, serverName, channel.getName(), message, List.of());
                 core.outbound(channel, packet);
             } else {
                 getLogger().warning("Player %s has no access to channel %s".formatted(playerName, channel.getName()));
@@ -391,7 +379,8 @@ public class ChatModLiteSpigot extends JavaPlugin
     @Override
     public com.ampznetwork.libmod.api.entity.Player getPlayer(UUID playerId) {
         var bukkitPlayer = getServer().getPlayer(playerId);
-        return basicPlayer(Objects.requireNonNull(bukkitPlayer, "bukkitPlayer"));
+        return basicPlayer(Objects.requireNonNull(bukkitPlayer,
+                "BukkitPlayer with ID %s could not be found".formatted(playerId)));
     }
 
     private Component formatMessage(String source, String channelName, OfflinePlayer player, Component content) {
