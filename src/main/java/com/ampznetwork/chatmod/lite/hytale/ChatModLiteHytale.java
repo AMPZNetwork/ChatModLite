@@ -53,7 +53,13 @@ public class ChatModLiteHytale extends JavaPlugin implements ChatDispatcher, Pla
         this.config = new HytaleConfigFile();
         config.syncLoad();
 
-        this.core = new ChatModCore(config, this, this, new HytalePermissionAdapter(), this, config);
+        this.core = new ChatModCore(config,
+                this,
+                this,
+                new HytalePermissionAdapter(),
+                this,
+                config,
+                new HytaleRecipientSerializer(this));
     }
 
     @Override
@@ -137,7 +143,7 @@ public class ChatModLiteHytale extends JavaPlugin implements ChatDispatcher, Pla
         var senderName = event.getSender().getUsername();
         var bundle  = ChatMessageParser.parse(plaintext, config, channel, player, senderName);
         var message = new ChatMessage(player, senderName, bundle);
-        var packet = new ChatMessagePacket(PacketType.CHAT, config.getServerName(), channel.getName(), message);
+        var packet  = new ChatMessagePacket(PacketType.CHAT, config.getServerName(), channel.getName(), message);
 
         core.outbound(channel, packet);
         event.setCancelled(true);

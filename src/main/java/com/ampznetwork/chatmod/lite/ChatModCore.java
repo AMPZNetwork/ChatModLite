@@ -7,6 +7,7 @@ import com.ampznetwork.chatmod.api.model.protocol.PacketType;
 import com.ampznetwork.chatmod.api.parse.ChatMessageParser;
 import com.ampznetwork.chatmod.lite.lang.Words;
 import com.ampznetwork.chatmod.lite.model.JacksonPacketConverter;
+import com.ampznetwork.chatmod.lite.model.RecipientSerializer;
 import com.ampznetwork.chatmod.lite.model.abstr.ChannelConfigProvider;
 import com.ampznetwork.chatmod.lite.model.abstr.ChatDispatcher;
 import com.ampznetwork.chatmod.lite.model.abstr.ChatModConfig;
@@ -17,7 +18,9 @@ import com.ampznetwork.chatmod.lite.model.exception.PermissionException;
 import com.ampznetwork.libmod.api.entity.Player;
 import com.ampznetwork.libmod.api.util.Util;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
 import lombok.Value;
+import lombok.experimental.NonFinal;
 import lombok.extern.java.Log;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.ComponentLike;
@@ -45,6 +48,7 @@ import static net.kyori.adventure.text.format.NamedTextColor.*;
 
 @Log
 @Value
+@RequiredArgsConstructor
 public class ChatModCore implements ChannelConfigProvider {
     private static ChatModCore instance;
 
@@ -52,12 +56,14 @@ public class ChatModCore implements ChannelConfigProvider {
         return instance;
     }
 
-    ChatModConfig                                          config;
-    ChatDispatcher                                         dispatcher;
-    PlayerAdapter                                          playerAdapter;
-    PermissionAdapter                                      permissionAdapter;
-    PacketCaster                                           packetCaster;
+    ChatModConfig       config;
+    ChatDispatcher      dispatcher;
+    PlayerAdapter       playerAdapter;
+    PermissionAdapter   permissionAdapter;
+    PacketCaster        packetCaster;
     ChannelConfigProvider channelProvider;
+    RecipientSerializer recipientSerializer;
+    @NonFinal Rabbit.Exchange.Route<ChatMessagePacket> systemChannel = null;
     ObjectMapper                                           objectMapper = new ObjectMapper();
     Map<Channel, Rabbit.Exchange.Route<ChatMessagePacket>> mqChannels   = new ConcurrentHashMap<>();
 
@@ -351,13 +357,41 @@ public class ChatModCore implements ChannelConfigProvider {
 
     public void loadMqChannels() {
         var exchange = config.getRabbit().exchange("minecraft", "topic");
+
+        systemChannel = initRoute(exchange, ChatModConfig.SYSTEM_CHANNEL_NAME);
+        log.info("System channel initialized");
+
         for (var channel : getChannels()) {
             if (!channel.isPublish()) continue;
-            var route = exchange.route(Util.Kyori.sanitizePlain(config.getServerName() + ".chat." + channel.getName())
-                    .toLowerCase(), "chat." + channel.getName(), new JacksonPacketConverter(getObjectMapper()));
-            route.subscribeData(packetCaster::localcastPacket);
+
+            var route = initRoute(exchange, channel.getName());
             getMqChannels().put(channel, route);
         }
+
         log.info("Created %d RabbitMQ bindings".formatted(getMqChannels().size()));
+    }
+
+    private Rabbit.Exchange.Route<ChatMessagePacket> initRoute(Rabbit.Exchange exchange, String channelName) {
+        var route = exchange.route(Util.Kyori.sanitizePlain(config.getServerName() + ".chat." + channelName)
+                .toLowerCase(), "chat." + channelName, new JacksonPacketConverter(getObjectMapper()));
+
+        route.subscribeData(this::dispatchLocalcast);
+
+        return route;
+    }
+
+    private void dispatchLocalcast(ChatMessagePacket packet) {
+        if (!packet.isSystem()) {
+            packetCaster.localcastPacket(packet);
+            return;
+        }
+
+        var component = packet.getMessage().getFullText();
+
+        packet.getRecipients()
+                .stream()
+                .map(recipientSerializer::deserializeRecipient)
+                .filter(Objects::nonNull)
+                .forEach(player -> dispatcher.sendToPlayer(component, player));
     }
 }

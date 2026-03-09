@@ -74,7 +74,13 @@ public class ChatModLiteSpigot extends JavaPlugin
     @NonFinal boolean compatibilityMode;
 
     public ChatModLiteSpigot() {
-        this.core = new ChatModCore(this, this, this, PermissionAdapter.spigot(), this, this);
+        this.core = new ChatModCore(this,
+                this,
+                this,
+                PermissionAdapter.spigot(),
+                this,
+                this,
+                new SpigotRecipientSerializer(this));
     }
 
     @Override
