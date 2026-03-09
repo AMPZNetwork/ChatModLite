@@ -21,6 +21,7 @@ import lombok.Value;
 import lombok.extern.java.Log;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.ComponentLike;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.advancement.Advancement;
 import org.comroid.api.net.Rabbit;
 import org.comroid.commands.model.permission.PermissionAdapter;
@@ -155,6 +156,8 @@ public class ChatModCore implements ChannelConfigProvider {
     }
 
     public void localcast(Channel channel, Component component) {
+        log.info(PlainTextComponentSerializer.plainText().serialize(component));
+
         channel.allPlayerIDs()
                 .map(playerAdapter::getPlayer)
                 .distinct()
