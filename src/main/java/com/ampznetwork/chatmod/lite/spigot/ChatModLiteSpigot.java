@@ -49,7 +49,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
@@ -384,11 +384,7 @@ public class ChatModLiteSpigot extends JavaPlugin
 
     @Override
     public @Nullable com.ampznetwork.libmod.api.entity.Player getPlayer(UUID playerId) {
-        if (playerId == null) return null;
-
-        var bukkitPlayer = getServer().getPlayer(playerId);
-        return basicPlayer(Objects.requireNonNull(bukkitPlayer,
-                "BukkitPlayer with ID %s could not be found".formatted(playerId)));
+        return Optional.ofNullable(playerId).map(getServer()::getPlayer).map(this::basicPlayer).orElse(null);
     }
 
     private Component formatMessage(String source, String channelName, OfflinePlayer player, Component content) {

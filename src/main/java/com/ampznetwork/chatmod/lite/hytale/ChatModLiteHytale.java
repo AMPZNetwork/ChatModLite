@@ -118,10 +118,10 @@ public class ChatModLiteHytale extends JavaPlugin implements ChatDispatcher, Pla
 
     @Override
     public @Nullable Player getPlayer(UUID playerId) {
-        if (playerId == null) return null;
-
-        var ref = Universe.get().getPlayer(playerId);
-        return Player.basic(playerId, ref != null ? ref.getUsername() : "Hytale User");
+        return Optional.ofNullable(playerId)
+                .map(Universe.get()::getPlayer)
+                .map(ref -> Player.basic(playerId, ref != null ? ref.getUsername() : "Hytale User"))
+                .orElse(null);
     }
 
     private PlayerChatEvent handleChat(PlayerChatEvent event) {
