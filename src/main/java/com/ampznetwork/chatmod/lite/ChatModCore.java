@@ -375,12 +375,17 @@ public class ChatModCore implements ChannelConfigProvider {
         var route = exchange.route(Util.Kyori.sanitizePlain(config.getServerName() + ".chat." + channelName)
                 .toLowerCase(), "chat." + channelName, new JacksonPacketConverter(getObjectMapper()));
 
-        route.subscribeData(this::dispatchLocalcast);
+        route.subscribeData(packet -> dispatchLocalcast(channelName, packet));
 
         return route;
     }
 
-    private void dispatchLocalcast(ChatMessagePacket packet) {
+    private void dispatchLocalcast(String channelName, ChatMessagePacket packet) {
+        if (!channelName.equals(packet.getChannel())) {
+            log.warning("Dropping packet because channel name differs from routing configuration: " + packet);
+            return;
+        }
+
         if (!packet.isSystem()) {
             packetCaster.localcastPacket(packet);
             return;
